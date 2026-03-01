@@ -7,6 +7,10 @@ description: 'Network transporter for communication with the Atomemo Hub Server'
 
 The Transporter provides WebSocket-based communication between plugins and the Atomemo Hub Server using the Phoenix Channels protocol. It handles connection management, message passing, and error handling.
 
+<Note>
+The Transporter is an internal component created automatically by `createPlugin()`. Plugin developers typically don't need to interact with it directly, as the SDK handles all communication automatically.
+</Note>
+
 ## Function Signature
 
 ```typescript
@@ -111,47 +115,59 @@ connect(channelName: string): Promise<{
 
 ## Example Usage
 
-### Basic Connection
+<Note>
+The Transporter is created internally by the SDK. The examples below show the internal implementation for reference. Plugin developers should use `createPlugin()` which handles transporter creation automatically.
+</Note>
+
+### Internal Implementation
+
+The transporter is created internally when you call `createPlugin()`:
 
 ```typescript
-import { createTransporter } from '@choiceopen/atomemo-plugin-sdk'
+import { createPlugin } from '@choiceopen/atomemo-plugin-sdk-js'
 
-const transporter = createTransporter({
-  heartbeatIntervalMs: 30000,
-  onOpen: () => console.log('WebSocket opened'),
-  onClose: (event) => console.log('WebSocket closed', event),
-  onError: (error) => console.error('WebSocket error', error)
-})
-
-const { channel, dispose } = await transporter.connect('debug_plugin:my-plugin')
-
-// Listen for messages
-channel.on('some_event', (message) => {
-  console.log('Received:', message)
-})
-
-// Send messages
-channel.push('some_event', { data: 'hello' })
-
-// Clean up when done
-process.on('SIGINT', dispose)
-```
-
-### With Custom Logger
-
-```typescript
-const transporter = createTransporter({
-  heartbeatIntervalMs: 60000,
-  onOpen: () => {
-    console.log('Connected to Atomemo Hub')
-  },
-  onMessage: (message) => {
-    console.log('Message received:', JSON.stringify(message, null, 2))
-  },
-  onError: (error, transport, connections) => {
-    console.error(`Error on ${transport} (${connections} connections):`, error)
+const plugin = await createPlugin({
+  name: 'my-plugin',
+  display_name: { en_US: 'My Plugin' },
+  description: { en_US: 'My plugin description' },
+  // The SDK creates and manages the transporter automatically
+  transporterOptions: {
+    heartbeatIntervalMs: 30000,
+    onOpen: () => console.log('Connection established'),
+    onClose: () => console.log('Connection closed')
   }
 })
+
+// Run the plugin (internally connects via transporter)
+await plugin.run()
+```
+
+### Custom Connection Handlers
+
+You can configure connection handlers via `transporterOptions`:
+
+```typescript
+import { createPlugin } from '@choiceopen/atomemo-plugin-sdk-js'
+
+const plugin = await createPlugin({
+  name: 'my-plugin',
+  display_name: { en_US: 'My Plugin' },
+  description: { en_US: 'My plugin description' },
+  transporterOptions: {
+    heartbeatIntervalMs: 60000,
+    onOpen: () => {
+      console.log('Connected to Atomemo Hub')
+    },
+    onMessage: (message) => {
+      console.log('Message received:', JSON.stringify(message, null, 2))
+    },
+    onError: (error, transport, connections) => {
+      console.error(`Error on ${transport} (${connections} connections):`, error)
+    }
+  }
+})
+
+await plugin.run()
 ```
 
 ## Connection URL

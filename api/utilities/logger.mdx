@@ -7,19 +7,16 @@ description: Structured logging with Pino for Atomemo plugins
 
 The logger module provides a pre-configured [Pino](https://getpino.io/) logger instance with environment-aware settings. It automatically adjusts log levels and formatting based on your environment.
 
-## Usage
+<Note>
+This is an internal utility used by the SDK for logging. Plugin developers can use standard `console.log()` or implement their own logging solution. The SDK's internal logger is not exported for external use.
+</Note>
 
-### Importing the Logger
+## Internal Usage
 
-```typescript
-import { logger } from "@atomemo/plugin-sdk"
-```
-
-### Basic Logging
+The SDK uses this logger internally for debugging and error reporting:
 
 ```typescript
-import { logger } from "@atomemo/plugin-sdk"
-
+// Internal SDK logging (for reference)
 logger.info("Plugin started")
 logger.error("Connection failed", { url: "wss://hub.atomemo.com" })
 logger.debug("Processing message", { messageId: 123 })
@@ -103,14 +100,14 @@ In production (`NODE_ENV=production`), logs are output as compact JSON for effic
 {"level":50,"time":"2026-03-01T12:34:57.123Z","url":"wss://hub.atomemo.com","msg":"Connection failed"}
 ```
 
-## Examples
+## Implementation Examples
+
+These examples show how the logger is used internally by the SDK:
 
 ### Structured Logging
 
 ```typescript
-import { logger } from "@atomemo/plugin-sdk"
-
-// Log with context object
+// Internal SDK code
 logger.info({ userId: "123", action: "login" }, "User logged in")
 
 // Log with error
@@ -123,11 +120,10 @@ try {
 
 ### Child Loggers
 
-Create child loggers with bound context:
+The SDK creates child loggers for different components:
 
 ```typescript
-import { logger } from "@atomemo/plugin-sdk"
-
+// Internal SDK code
 const pluginLogger = logger.child({ plugin: "my-plugin", version: "1.0.0" })
 
 pluginLogger.info("Initialized") // Includes plugin and version in every log
@@ -136,9 +132,7 @@ pluginLogger.info("Initialized") // Includes plugin and version in every log
 ### Conditional Logging
 
 ```typescript
-import { logger } from "@atomemo/plugin-sdk"
-import { getEnv } from "@atomemo/plugin-sdk"
-
+// Internal SDK code
 const env = getEnv()
 
 if (env.DEBUG) {

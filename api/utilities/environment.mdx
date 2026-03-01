@@ -7,6 +7,10 @@ description: Environment variable management and validation for Atomemo plugins
 
 The environment module provides type-safe environment variable management with Zod-based validation. It ensures all required environment variables are present and valid before your plugin runs.
 
+<Note>
+This is an internal utility used by the SDK. Plugin developers don't need to call `getEnv()` directly - the SDK handles environment validation automatically when you call `createPlugin()`.
+</Note>
+
 ## Functions
 
 ### getEnv()
@@ -27,11 +31,12 @@ function getEnv(): {
 
 **Throws:** Exits the process with code 1 if validation fails
 
-#### Example
+#### Internal Usage
+
+The SDK uses `getEnv()` internally during plugin initialization:
 
 ```typescript
-import { getEnv } from "@atomemo/plugin-sdk"
-
+// Internal SDK code (you don't need to call this)
 const env = getEnv()
 
 if (env.DEBUG) {
