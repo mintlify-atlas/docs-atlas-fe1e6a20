@@ -1,0 +1,109 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Atomemo Plugin SDK for JavaScript/TypeScript",
+  "projectDescription": "A TypeScript SDK for developing Choiceform Atomemo plugins with WebSocket-based communication and type-safe feature registration.",
+  "theme": "palm",
+  "primaryColor": "#6366f1",
+  "lightColor": "#818cf8",
+  "darkColor": "#4f46e5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/plugins",
+              "concepts/credentials",
+              "concepts/tools",
+              "concepts/models",
+              "concepts/registry",
+              "concepts/transporter"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-a-plugin",
+              "guides/adding-credentials",
+              "guides/adding-tools",
+              "guides/adding-models",
+              "guides/environment-setup",
+              "guides/debug-mode"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/basic-plugin",
+              "examples/tool-with-credentials",
+              "examples/custom-model"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/create-plugin",
+              "api/plugin-instance",
+              "api/registry",
+              "api/transporter"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types/plugin-definition",
+              "api/types/credential-definition",
+              "api/types/tool-definition",
+              "api/types/model-definition",
+              "api/types/transporter-options"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/utilities/environment",
+              "api/utilities/logger"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Type-safe plugin creation and management",
+    "WebSocket-based real-time communication with Hub Server",
+    "Built-in credential, tool, and model registration system",
+    "Debug and release mode support",
+    "Phoenix Channel integration for message handling",
+    "Environment variable validation and configuration"
+  ],
+  "publicApiSurface": [
+    "createPlugin(options)",
+    "plugin.addCredential(credential)",
+    "plugin.addTool(tool)",
+    "plugin.addModel(model)",
+    "plugin.run()",
+    "createRegistry(plugin)",
+    "registry.register(type, feature)",
+    "registry.resolve(type, featureName)",
+    "registry.serialize()",
+    "createTransporter(options)",
+    "transporter.connect(channelName)",
+    "getEnv()"
+  ]
+}
