@@ -1,0 +1,127 @@
+---
+title: PluginDefinition
+description: Type definition for configuring an Atomemo plugin
+---
+
+## Overview
+
+The `PluginDefinition` type defines the core configuration for an Atomemo plugin. It contains metadata, localization settings, and optional transporter configuration.
+
+## Type Definition
+
+```typescript
+type PluginDefinition<Locales extends string[], Options = TransporterOptions> = {
+  name: string
+  display_name: Record<Locales[number], string>
+  description: Record<Locales[number], string>
+  icon: string
+  author?: string
+  email?: string
+  version?: string
+  locales: Locales
+  transporterOptions?: Options
+}
+```
+
+## Properties
+
+<ParamField path="name" type="string" required>
+  The unique identifier for the plugin. Must be a valid plugin name.
+  
+  **Example:** `"my-plugin"`
+</ParamField>
+
+<ParamField path="display_name" type="Record<Locale, string>" required>
+  Localized display names for the plugin. Keys should match the locales defined in the `locales` property.
+  
+  **Example:**
+  ```typescript
+  {
+    en_US: "My Plugin",
+    es_ES: "Mi Plugin"
+  }
+  ```
+</ParamField>
+
+<ParamField path="description" type="Record<Locale, string>" required>
+  Localized descriptions of what the plugin does. Keys should match the locales defined in the `locales` property.
+  
+  **Example:**
+  ```typescript
+  {
+    en_US: "A plugin for managing tasks",
+    es_ES: "Un plugin para gestionar tareas"
+  }
+  ```
+</ParamField>
+
+<ParamField path="icon" type="string" required>
+  An emoji or icon representation of the plugin.
+  
+  **Example:** `"🔌"` or `"⚡"`
+</ParamField>
+
+<ParamField path="author" type="string">
+  The name of the plugin author. This is automatically populated from the user session in debug mode or from `definition.json` in release mode.
+  
+  **Note:** You typically don't need to provide this manually.
+</ParamField>
+
+<ParamField path="email" type="string">
+  The email address of the plugin author. This is automatically populated from the user session in debug mode or from `definition.json` in release mode.
+  
+  **Note:** You typically don't need to provide this manually.
+</ParamField>
+
+<ParamField path="version" type="string">
+  The semantic version of the plugin. Defaults to `process.env.npm_package_version` if not provided.
+  
+  **Example:** `"1.0.0"`
+</ParamField>
+
+<ParamField path="locales" type="string[]" required>
+  An array of supported locale codes. These locales determine which keys are valid in `display_name` and `description`.
+  
+  **Example:** `["en_US", "es_ES", "fr_FR"]`
+</ParamField>
+
+<ParamField path="transporterOptions" type="TransporterOptions">
+  Optional configuration for the network transporter that connects to the Hub Server. See [TransporterOptions](/api/types/transporter-options) for details.
+</ParamField>
+
+## Example
+
+```typescript
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({
+  name: "task-manager",
+  display_name: {
+    en_US: "Task Manager",
+    es_ES: "Gestor de Tareas"
+  },
+  description: {
+    en_US: "Manage and organize your tasks efficiently",
+    es_ES: "Gestiona y organiza tus tareas eficientemente"
+  },
+  icon: "📋",
+  locales: ["en_US", "es_ES"],
+  version: "1.0.0",
+  transporterOptions: {
+    heartbeatIntervalMs: 30000,
+    onOpen: () => console.log("Connected to Hub"),
+  }
+})
+```
+
+## Related Types
+
+- [TransporterOptions](/api/types/transporter-options) - Configuration for the network transporter
+- [CredentialDefinition](/api/types/credential-definition) - For adding credentials to the plugin
+- [ToolDefinition](/api/types/tool-definition) - For adding tools to the plugin
+- [ModelDefinition](/api/types/model-definition) - For adding models to the plugin
+
+## See Also
+
+- [createPlugin()](/api/create-plugin) - Function that accepts this type
+- [Creating a Plugin](/guides/creating-a-plugin) - Step-by-step guide

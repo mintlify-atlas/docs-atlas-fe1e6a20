@@ -1,0 +1,304 @@
+---
+title: "Creating a Plugin"
+description: "Learn how to create your first Atomemo plugin from scratch"
+---
+
+This guide walks you through creating a complete Atomemo plugin using the JavaScript/TypeScript SDK.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- **Bun runtime** installed (v1.0 or higher)
+- **Node.js** knowledge (TypeScript recommended)
+- A code editor with TypeScript support
+
+## Project Setup
+
+<Steps>
+  <Step title="Initialize your project">
+    Create a new directory and initialize a Bun project:
+
+    ```bash
+    mkdir my-plugin
+    cd my-plugin
+    bun init
+    ```
+  </Step>
+
+  <Step title="Install the SDK">
+    Install the Atomemo Plugin SDK and its peer dependencies:
+
+    ```bash
+    bun add @choiceopen/atomemo-plugin-sdk-js
+    bun add zod chalk dotenv
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Create a `.env` file in your project root:
+
+    ```bash
+    HUB_MODE=debug
+    HUB_WS_URL=wss://hub.atomemo.ai
+    HUB_DEBUG_API_KEY=your_api_key_here
+    DEBUG=true
+    NODE_ENV=development
+    ```
+
+    <Note>
+      See [Environment Setup](/guides/environment-setup) for detailed configuration options.
+    </Note>
+  </Step>
+
+  <Step title="Create your plugin file">
+    Create an `index.ts` file with the basic plugin structure:
+
+    ```typescript
+    import "dotenv/config"
+    import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+    const plugin = await createPlugin({
+      name: "my-plugin",
+      display_name: { en_US: "My Plugin" },
+      description: { 
+        en_US: "A simple plugin to get started with Atomemo" 
+      },
+      icon: "🔌",
+      locales: ["en_US"],
+      version: "0.1.0",
+    })
+
+    // Add features here
+
+    await plugin.run()
+    ```
+  </Step>
+
+  <Step title="Run your plugin">
+    Start your plugin in debug mode:
+
+    ```bash
+    bun run index.ts
+    ```
+
+    You should see output indicating successful connection to the Hub Server.
+  </Step>
+</Steps>
+
+## Plugin Definition Structure
+
+The `createPlugin` function accepts a configuration object with these required fields:
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Unique identifier for your plugin (kebab-case) |
+| `display_name` | `Record<Locale, string>` | Human-readable name (localized) |
+| `description` | `Record<Locale, string>` | Brief description of plugin functionality |
+| `icon` | `string` | Emoji or icon representing your plugin |
+| `locales` | `string[]` | Supported locales (e.g., `["en_US", "zh_CN"]`) |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | `string` | Plugin version (defaults to `npm_package_version`) |
+| `author` | `string` | Author name (auto-populated in debug mode) |
+| `email` | `string` | Author email (auto-populated in debug mode) |
+| `transporterOptions` | `TransporterOptions` | Custom WebSocket configuration |
+
+## Understanding Plugin Lifecycle
+
+When you call `plugin.run()`, the SDK:
+
+<Steps>
+  <Step title="Initializes environment">
+    - Validates required environment variables
+    - Determines runtime mode (debug or release)
+    - Fetches or loads author information
+  </Step>
+
+  <Step title="Establishes connection">
+    - Creates WebSocket connection to Hub Server
+    - Joins the appropriate channel based on mode:
+      - **Debug mode**: `debug_plugin:{plugin-name}`
+      - **Release mode**: `release_plugin:{plugin-name}__{mode}__{version}`
+  </Step>
+
+  <Step title="Registers plugin">
+    In debug mode:
+    - Sends plugin definition to Hub Server
+    - Writes `definition.json` to disk for reference
+  </Step>
+
+  <Step title="Listens for events">
+    - `credential_auth_spec`: Credential authentication requests
+    - `invoke_tool`: Tool invocation requests
+    - Handles graceful shutdown on SIGINT/SIGTERM
+  </Step>
+</Steps>
+
+## Plugin Modes
+
+### Debug Mode
+
+Enabled when `HUB_MODE=debug` (default). Features:
+
+- Dynamic registration with Hub Server
+- Hot-reload support
+- User authentication via OneAuth API
+- Requires `HUB_DEBUG_API_KEY`
+- Generates `definition.json` for inspection
+
+```typescript
+// Debug mode automatically enabled
+const plugin = await createPlugin({
+  name: "my-plugin",
+  // ...
+})
+```
+
+### Release Mode
+
+Enabled when `HUB_MODE=release`. Features:
+
+- Production-ready deployment
+- Reads author info from `definition.json`
+- Versioned channel connections
+- No API key required
+
+```bash
+# Set in .env for release
+HUB_MODE=release
+NODE_ENV=production
+```
+
+## Adding Features
+
+Once your plugin is created, you can add features:
+
+```typescript
+const plugin = await createPlugin({ /* ... */ })
+
+// Add credentials
+plugin.addCredential({
+  name: "api-key",
+  display_name: { en_US: "API Key" },
+  // ...
+})
+
+// Add tools
+plugin.addTool({
+  name: "send-message",
+  display_name: { en_US: "Send Message" },
+  invoke: async ({ args }) => {
+    // Tool implementation
+    return { success: true }
+  },
+})
+
+// Add models
+plugin.addModel({
+  name: "provider/model-name",
+  display_name: { en_US: "Custom Model" },
+  model_type: "llm",
+  // ...
+})
+
+await plugin.run()
+```
+
+<Note>
+  See dedicated guides for each feature type:
+  - [Adding Credentials](/guides/adding-credentials)
+  - [Adding Tools](/guides/adding-tools)
+  - [Adding Models](/guides/adding-models)
+</Note>
+
+## Error Handling
+
+The SDK automatically handles common errors:
+
+### Connection Errors
+
+When the WebSocket connection fails:
+
+```
+Error: Can't connect to the Plugin Hub server.
+
+This is usually because the Debug API Key is missing or has expired.
+
+Run `atomemo plugin refresh-key` to get a new key.
+```
+
+### Validation Errors
+
+If your plugin definition is invalid, you'll see detailed Zod validation errors:
+
+```typescript
+// Invalid configuration
+const plugin = await createPlugin({
+  // Missing required fields
+  name: "test",
+})
+// Error: Invalid plugin definition
+// - display_name: Required
+// - description: Required
+// ...
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use semantic versioning">
+    Follow semantic versioning for your plugin versions:
+    ```typescript
+    version: "1.2.3"
+    // MAJOR.MINOR.PATCH
+    ```
+  </Accordion>
+
+  <Accordion title="Provide localized content">
+    Support multiple locales from the start:
+    ```typescript
+    display_name: {
+      en_US: "My Plugin",
+      zh_CN: "我的插件",
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use descriptive names">
+    Choose clear, action-oriented names:
+    ```typescript
+    // Good
+    name: "slack-connector"
+    
+    // Avoid
+    name: "plugin1"
+    ```
+  </Accordion>
+
+  <Accordion title="Handle graceful shutdown">
+    The SDK automatically handles SIGINT and SIGTERM signals. Your async operations should be designed to complete or cancel cleanly.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Add Credentials" icon="key" href="/guides/adding-credentials">
+    Secure API keys and authentication
+  </Card>
+  <Card title="Add Tools" icon="wrench" href="/guides/adding-tools">
+    Create executable functionality
+  </Card>
+  <Card title="Add Models" icon="brain" href="/guides/adding-models">
+    Integrate AI models
+  </Card>
+  <Card title="Debug Mode" icon="bug" href="/guides/debug-mode">
+    Test and troubleshoot your plugin
+  </Card>
+</CardGroup>

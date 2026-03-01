@@ -1,0 +1,285 @@
+---
+title: ModelDefinition
+description: Type definition for AI model configurations in Atomemo plugins
+---
+
+## Overview
+
+The `ModelDefinition` type defines AI models (LLMs, embeddings, etc.) that can be used within the Atomemo platform. Models describe their capabilities, supported modalities, and limitations.
+
+## Type Definition
+
+```typescript
+type ModelDefinition = {
+  name: string
+  display_name: Record<string, string>
+  description: Record<string, string>
+  icon: string
+  model_type: "llm" | "embedding" | "image" | "audio" | "video"
+  input_modalities: Modality[]
+  output_modalities: Modality[]
+  unsupported_parameters: string[]
+  credentials?: string[]
+}
+
+type Modality = "text" | "image" | "audio" | "video"
+```
+
+## Properties
+
+<ParamField path="name" type="string" required>
+  The unique identifier for the model, typically in the format `provider/model-name`.
+  
+  **Example:** `"openai/gpt-4"` or `"anthropic/claude-3-opus"`
+</ParamField>
+
+<ParamField path="display_name" type="Record<string, string>" required>
+  Localized display names for the model.
+  
+  **Example:**
+  ```typescript
+  {
+    en_US: "GPT-4 Turbo",
+    es_ES: "GPT-4 Turbo"
+  }
+  ```
+</ParamField>
+
+<ParamField path="description" type="Record<string, string>" required>
+  Localized descriptions explaining the model's capabilities.
+  
+  **Example:**
+  ```typescript
+  {
+    en_US: "Advanced language model with vision capabilities",
+    es_ES: "Modelo de lenguaje avanzado con capacidades de visión"
+  }
+  ```
+</ParamField>
+
+<ParamField path="icon" type="string" required>
+  An emoji or icon representing the model.
+  
+  **Example:** `"🤖"` or `"🧠"`
+</ParamField>
+
+<ParamField path="model_type" type="string" required>
+  The category or type of the model.
+  
+  **Options:**
+  - `"llm"` - Large Language Model (text generation, chat)
+  - `"embedding"` - Text embedding model
+  - `"image"` - Image generation or processing model
+  - `"audio"` - Audio processing model
+  - `"video"` - Video processing model
+</ParamField>
+
+<ParamField path="input_modalities" type="Modality[]" required>
+  Array of input types the model can accept.
+  
+  **Options:** `"text"`, `"image"`, `"audio"`, `"video"`
+  
+  **Example:** `["text", "image"]` for a multimodal LLM
+</ParamField>
+
+<ParamField path="output_modalities" type="Modality[]" required>
+  Array of output types the model can generate.
+  
+  **Options:** `"text"`, `"image"`, `"audio"`, `"video"`
+  
+  **Example:** `["text"]` for a text-only model
+</ParamField>
+
+<ParamField path="unsupported_parameters" type="string[]" required>
+  List of standard parameters that this model does not support.
+  
+  **Common parameters:**
+  - `"temperature"` - Controls randomness
+  - `"top_p"` - Nucleus sampling parameter
+  - `"max_tokens"` - Maximum output length
+  - `"stop"` - Stop sequences
+  - `"frequency_penalty"` - Penalizes frequent tokens
+  - `"presence_penalty"` - Penalizes repeated tokens
+  
+  **Example:** `["frequency_penalty", "presence_penalty"]`
+</ParamField>
+
+<ParamField path="credentials" type="string[]">
+  Optional array of credential names required to use this model. The credentials must be registered with the plugin using `addCredential()`.
+  
+  **Example:** `["api-key"]`
+</ParamField>
+
+## Usage
+
+Models are registered using the `addModel()` method on the plugin instance:
+
+```typescript
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({
+  name: "openai-plugin",
+  display_name: { en_US: "OpenAI Plugin" },
+  description: { en_US: "Access OpenAI models" },
+  icon: "🤖",
+  locales: ["en_US"]
+})
+
+plugin.addModel({
+  name: "openai/gpt-4-turbo",
+  display_name: {
+    en_US: "GPT-4 Turbo"
+  },
+  description: {
+    en_US: "Advanced language model with vision capabilities"
+  },
+  icon: "🤖",
+  model_type: "llm",
+  input_modalities: ["text", "image"],
+  output_modalities: ["text"],
+  unsupported_parameters: [],
+  credentials: ["openai-api-key"]
+})
+```
+
+## Example: LLM Model
+
+```typescript
+plugin.addModel({
+  name: "anthropic/claude-3-opus",
+  display_name: {
+    en_US: "Claude 3 Opus"
+  },
+  description: {
+    en_US: "Anthropic's most powerful model for complex tasks"
+  },
+  icon: "🧠",
+  model_type: "llm",
+  input_modalities: ["text", "image"],
+  output_modalities: ["text"],
+  unsupported_parameters: ["frequency_penalty", "presence_penalty"],
+  credentials: ["anthropic-api-key"]
+})
+```
+
+## Example: Embedding Model
+
+```typescript
+plugin.addModel({
+  name: "openai/text-embedding-3-large",
+  display_name: {
+    en_US: "Text Embedding 3 Large"
+  },
+  description: {
+    en_US: "High-performance text embedding model"
+  },
+  icon: "📊",
+  model_type: "embedding",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: [
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "frequency_penalty",
+    "presence_penalty"
+  ],
+  credentials: ["openai-api-key"]
+})
+```
+
+## Example: Image Generation Model
+
+```typescript
+plugin.addModel({
+  name: "openai/dall-e-3",
+  display_name: {
+    en_US: "DALL-E 3"
+  },
+  description: {
+    en_US: "Advanced image generation model"
+  },
+  icon: "🎨",
+  model_type: "image",
+  input_modalities: ["text"],
+  output_modalities: ["image"],
+  unsupported_parameters: [
+    "temperature",
+    "top_p",
+    "frequency_penalty",
+    "presence_penalty"
+  ],
+  credentials: ["openai-api-key"]
+})
+```
+
+## Example: Model Without Credentials
+
+```typescript
+plugin.addModel({
+  name: "local/llama-3-8b",
+  display_name: {
+    en_US: "Llama 3 8B (Local)"
+  },
+  description: {
+    en_US: "Locally hosted Llama 3 model"
+  },
+  icon: "🦙",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: ["stop"]
+  // No credentials required for local models
+})
+```
+
+## Model Capabilities
+
+The `input_modalities` and `output_modalities` properties define what the model can process:
+
+### Text-only LLM
+```typescript
+input_modalities: ["text"]
+output_modalities: ["text"]
+```
+
+### Multimodal LLM (Vision)
+```typescript
+input_modalities: ["text", "image"]
+output_modalities: ["text"]
+```
+
+### Image Generator
+```typescript
+input_modalities: ["text"]
+output_modalities: ["image"]
+```
+
+### Audio Transcription
+```typescript
+input_modalities: ["audio"]
+output_modalities: ["text"]
+```
+
+## Unsupported Parameters
+
+Use `unsupported_parameters` to indicate which standard parameters the model doesn't support. This helps the platform provide appropriate UI and prevent errors.
+
+```typescript
+unsupported_parameters: [
+  "frequency_penalty",  // Model doesn't support frequency penalty
+  "presence_penalty",   // Model doesn't support presence penalty
+  "stop"                // Model doesn't support custom stop sequences
+]
+```
+
+## Related Types
+
+- [CredentialDefinition](/api/types/credential-definition) - Credentials used by models
+- [PluginDefinition](/api/types/plugin-definition) - Parent plugin configuration
+
+## See Also
+
+- [Adding Models](/guides/adding-models) - Step-by-step guide
+- [Plugin Instance](/api/plugin-instance) - The `addModel()` method
+- [Custom Model Example](/examples/custom-model)

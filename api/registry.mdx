@@ -1,0 +1,268 @@
+---
+title: 'Registry'
+description: 'Internal registry system for managing plugin features'
+---
+
+## Overview
+
+The Registry is an internal system created by `createRegistry()` that manages the storage and retrieval of plugin features (credentials, models, tools). It is used internally by the plugin instance and typically not accessed directly by plugin developers.
+
+## Type Definition
+
+```typescript
+interface Registry {
+  plugin: PluginRegistry
+  register(type: FeatureType, feature: Feature): void
+  resolve(type: FeatureType, featureName: string): Feature
+  serialize(): SerializedRegistry
+}
+
+type FeatureType = 'credential' | 'model' | 'tool'
+```
+
+## Function Signature
+
+```typescript
+function createRegistry(plugin: PluginRegistry): Registry
+```
+
+### Parameters
+
+<ParamField path="plugin" type="PluginRegistry" required>
+  The plugin definition object (excluding transporter options)
+  
+  <Expandable title="properties">
+    <ParamField path="name" type="string" required>
+      The plugin name
+    </ParamField>
+    
+    <ParamField path="description" type="string" required>
+      The plugin description
+    </ParamField>
+    
+    <ParamField path="author" type="string" required>
+      The plugin author name
+    </ParamField>
+    
+    <ParamField path="email" type="string" required>
+      The plugin author email
+    </ParamField>
+    
+    <ParamField path="version" type="string" required>
+      The plugin version
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Properties
+
+### plugin
+
+```typescript
+plugin: PluginRegistry
+```
+
+The plugin metadata and definitions, excluding transporter options.
+
+## Methods
+
+### register
+
+Registers a feature (credential, model, or tool) into the registry.
+
+```typescript
+register(type: 'credential', feature: CredentialDefinition): void
+register(type: 'model', feature: ModelDefinition): void
+register(type: 'tool', feature: ToolDefinition): void
+```
+
+#### Parameters
+
+<ParamField path="type" type="'credential' | 'model' | 'tool'" required>
+  The type of feature to register
+</ParamField>
+
+<ParamField path="feature" type="CredentialDefinition | ModelDefinition | ToolDefinition" required>
+  The feature definition to register. Must match the type specified.
+</ParamField>
+
+#### Example
+
+```typescript
+const registry = createRegistry({
+  name: 'my-plugin',
+  description: 'My plugin',
+  author: 'John Doe',
+  email: 'john@example.com',
+  version: '1.0.0'
+})
+
+registry.register('tool', {
+  name: 'my-tool',
+  description: 'Does something useful',
+  parameters: { query: { type: 'string' } },
+  invoke: async ({ parameters }) => ({ result: 'success' })
+})
+```
+
+---
+
+### resolve
+
+Resolves and retrieves a registered feature by its type and name.
+
+```typescript
+resolve(type: 'credential', featureName: string): CredentialDefinition
+resolve(type: 'model', featureName: string): ModelDefinition
+resolve(type: 'tool', featureName: string): ToolDefinition
+```
+
+#### Parameters
+
+<ParamField path="type" type="'credential' | 'model' | 'tool'" required>
+  The type of feature to resolve
+</ParamField>
+
+<ParamField path="featureName" type="string" required>
+  The name of the feature to retrieve
+</ParamField>
+
+#### Returns
+
+<ResponseField name="feature" type="CredentialDefinition | ModelDefinition | ToolDefinition">
+  The resolved feature definition
+</ResponseField>
+
+#### Throws
+
+- Error if the feature with the specified name is not registered
+
+#### Example
+
+```typescript
+const toolDefinition = registry.resolve('tool', 'my-tool')
+console.log(toolDefinition.description) // 'Does something useful'
+
+// Throws error if not found
+try {
+  registry.resolve('tool', 'non-existent-tool')
+} catch (error) {
+  console.error(error.message) // 'Feature "non-existent-tool" not registered'
+}
+```
+
+---
+
+### serialize
+
+Serializes the entire registry into a JSON-compatible object format.
+
+```typescript
+serialize(): {
+  plugin: PluginRegistry & {
+    credentials: Array<Record<string, JsonValue>>
+    models: Array<Record<string, JsonValue>>
+    tools: Array<Record<string, JsonValue>>
+  }
+}
+```
+
+#### Returns
+
+<ResponseField name="serialized" type="object">
+  The serialized registry
+  
+  <Expandable title="properties">
+    <ResponseField name="plugin" type="object">
+      The plugin metadata with all registered features
+      
+      <Expandable title="properties">
+        <ResponseField name="name" type="string">
+          Plugin name
+        </ResponseField>
+        
+        <ResponseField name="description" type="string">
+          Plugin description
+        </ResponseField>
+        
+        <ResponseField name="author" type="string">
+          Plugin author
+        </ResponseField>
+        
+        <ResponseField name="email" type="string">
+          Plugin author email
+        </ResponseField>
+        
+        <ResponseField name="version" type="string">
+          Plugin version
+        </ResponseField>
+        
+        <ResponseField name="credentials" type="Array<Record<string, JsonValue>>">
+          Array of serialized credential definitions
+        </ResponseField>
+        
+        <ResponseField name="models" type="Array<Record<string, JsonValue>>">
+          Array of serialized model definitions
+        </ResponseField>
+        
+        <ResponseField name="tools" type="Array<Record<string, JsonValue>>">
+          Array of serialized tool definitions
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Throws
+
+- Error if the plugin is not registered (should never happen in normal usage)
+
+#### Example
+
+```typescript
+const serialized = registry.serialize()
+console.log(JSON.stringify(serialized, null, 2))
+// {
+//   "plugin": {
+//     "name": "my-plugin",
+//     "description": "My plugin",
+//     "author": "John Doe",
+//     "email": "john@example.com",
+//     "version": "1.0.0",
+//     "credentials": [],
+//     "models": [],
+//     "tools": [
+//       {
+//         "name": "my-tool",
+//         "description": "Does something useful",
+//         "parameters": { "query": { "type": "string" } }
+//       }
+//     ]
+//   }
+// }
+```
+
+## Internal Storage
+
+The registry uses `Map` objects internally to store features:
+
+```typescript
+interface RegistryStore {
+  plugin: PluginRegistry
+  credential: Map<string, CredentialDefinition>
+  model: Map<string, ModelDefinition>
+  tool: Map<string, ToolDefinition>
+}
+```
+
+Each feature is stored with its `name` as the key, ensuring unique feature names per type.
+
+## Usage in Plugin Instance
+
+The registry is created automatically when you call `createPlugin()` and is used internally by the plugin instance methods:
+
+- `plugin.addCredential()` calls `registry.register('credential', ...)`
+- `plugin.addTool()` calls `registry.register('tool', ...)`
+- `plugin.addModel()` calls `registry.register('model', ...)`
+- Event handlers use `registry.resolve()` to retrieve feature definitions
+- Debug mode uses `registry.serialize()` to write `definition.json`

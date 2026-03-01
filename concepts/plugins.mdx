@@ -1,0 +1,262 @@
+---
+title: "Plugins"
+description: "Understanding the core plugin architecture and lifecycle"
+---
+
+## Overview
+
+A plugin is the fundamental building block of the Atomemo Plugin SDK. It represents a complete automation unit that packages together credentials, tools, models, and metadata to provide functionality to the Atomemo platform.
+
+## Creating a Plugin
+
+Use the `createPlugin` function to initialize a new plugin instance:
+
+```typescript
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({
+  name: "my-plugin",
+  display_name: { en_US: "My Plugin" },
+  description: { en_US: "A plugin that does amazing things" },
+  icon: "https://example.com/icon.png",
+  version: "1.0.0",
+  transporterOptions: {
+    heartbeatIntervalMs: 30000
+  }
+})
+```
+
+## Plugin Metadata
+
+Each plugin requires the following metadata:
+
+<ResponseField name="name" type="string" required>
+  Unique identifier for your plugin. Used for registration and routing.
+</ResponseField>
+
+<ResponseField name="display_name" type="object" required>
+  Localized display names for your plugin. Keys are locale codes (e.g., `en_US`).
+</ResponseField>
+
+<ResponseField name="description" type="object" required>
+  Localized descriptions of what your plugin does.
+</ResponseField>
+
+<ResponseField name="icon" type="string">
+  URL to your plugin's icon image.
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Plugin version following semantic versioning. Defaults to `npm_package_version` if not specified.
+</ResponseField>
+
+<ResponseField name="transporterOptions" type="TransporterOptions">
+  Configuration for the WebSocket transporter. See [Transporter](/concepts/transporter) for details.
+</ResponseField>
+
+## Author Information
+
+The SDK automatically handles author information based on the runtime mode:
+
+### Debug Mode
+In debug mode, the SDK fetches user information from your OneAuth session:
+
+```typescript
+const session = await getSession(deployment)
+user = { name: session.user.name, email: session.user.email }
+```
+
+### Release Mode
+In release mode, author information is read from `definition.json`:
+
+```json
+{
+  "author": "Jane Doe",
+  "email": "jane@example.com"
+}
+```
+
+## Plugin Lifecycle
+
+### 1. Initialization
+
+When you create a plugin, the SDK:
+
+1. Validates and loads environment variables
+2. Fetches author information (debug or release mode)
+3. Creates an internal registry for features
+4. Initializes the transporter for Hub Server communication
+
+### 2. Registration Phase
+
+Add features to your plugin using the registration methods:
+
+```typescript
+// Add credentials
+plugin.addCredential({
+  name: "api_key",
+  display_name: { en_US: "API Key" },
+  schema: {
+    type: "object",
+    properties: {
+      key: { type: "string" }
+    }
+  }
+})
+
+// Add tools
+plugin.addTool({
+  name: "fetch_data",
+  display_name: { en_US: "Fetch Data" },
+  invoke: async ({ args }) => {
+    // Tool implementation
+    return { data: "result" }
+  }
+})
+
+// Add models
+plugin.addModel({
+  name: "gpt-4",
+  display_name: { en_US: "GPT-4" },
+  model_type: "llm"
+})
+```
+
+<Note>
+  All features are validated using Zod schemas before being registered. Invalid definitions will throw an error at registration time.
+</Note>
+
+### 3. Runtime Phase
+
+Start your plugin with the `run()` method:
+
+```typescript
+await plugin.run()
+```
+
+During runtime, the plugin:
+
+1. **Connects** to the Hub Server via WebSocket
+2. **Joins** the appropriate channel (`debug_plugin` or `release_plugin`)
+3. **Registers** all features with the Hub Server (debug mode only)
+4. **Listens** for incoming requests:
+   - `credential_auth_spec` - Credential authentication requests
+   - `invoke_tool` - Tool invocation requests
+5. **Handles** graceful shutdown on SIGINT/SIGTERM signals
+
+## Channel Naming
+
+The SDK automatically determines the correct channel name based on runtime mode:
+
+```typescript
+// Debug mode
+const topic = `debug_plugin:${plugin.name}`
+
+// Release mode
+const topic = `release_plugin:${plugin.name}__${env.HUB_MODE}__${version}`
+```
+
+## Event Handling
+
+### Tool Invocation
+
+When the Hub Server requests a tool invocation:
+
+```typescript
+channel.on("invoke_tool", async (message) => {
+  const { request_id, tool_name, parameters, credentials } = message
+  
+  try {
+    // Resolve tool definition from registry
+    const definition = registry.resolve("tool", tool_name)
+    
+    // Execute tool
+    const result = await definition.invoke({ 
+      args: { credentials, parameters } 
+    })
+    
+    // Send success response
+    channel.push("invoke_tool_response", { request_id, data: result })
+  } catch (error) {
+    // Send error response
+    channel.push("invoke_tool_error", { 
+      request_id, 
+      message: error.message 
+    })
+  }
+})
+```
+
+### Credential Authentication
+
+When the Hub Server needs to authenticate credentials:
+
+```typescript
+channel.on("credential_auth_spec", async (message) => {
+  const { request_id, credential_name, credential, extra } = message
+  
+  try {
+    const definition = registry.resolve("credential", credential_name)
+    const result = await definition.authenticate({ 
+      args: { credential, extra } 
+    })
+    
+    channel.push("credential_auth_spec_response", { request_id, data: result })
+  } catch (error) {
+    channel.push("credential_auth_spec_error", { request_id, ...error })
+  }
+})
+```
+
+## Definition Export
+
+In debug mode, the SDK automatically exports your plugin definition:
+
+```typescript
+if (isDebugMode) {
+  const definition = registry.serialize().plugin
+  await Bun.write("definition.json", JSON.stringify(definition, null, 2))
+}
+```
+
+This creates a `definition.json` file containing all plugin metadata and registered features, which is used for release deployments.
+
+## Error Handling
+
+The plugin system includes comprehensive error handling:
+
+- **Validation errors**: Thrown during feature registration if definitions are invalid
+- **Connection errors**: Caught and logged with helpful messages about API keys
+- **Runtime errors**: Caught during tool invocation and sent back to the Hub Server
+
+<Warning>
+  Always implement proper error handling in your tool `invoke` functions. Unhandled errors will be caught by the SDK but may not provide meaningful feedback to users.
+</Warning>
+
+## Best Practices
+
+1. **Use descriptive names**: Plugin and feature names should be clear and descriptive
+2. **Provide localization**: Always include at least `en_US` for display names and descriptions
+3. **Version properly**: Follow semantic versioning for your plugin versions
+4. **Handle errors gracefully**: Implement proper error handling in all tool implementations
+5. **Test in debug mode**: Always test your plugin in debug mode before releasing
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Credentials" icon="key" href="/concepts/credentials">
+    Learn how to define and authenticate credentials
+  </Card>
+  
+  <Card title="Tools" icon="wrench" href="/concepts/tools">
+    Create executable tools for your plugin
+  </Card>
+  
+  <Card title="Registry" icon="book" href="/concepts/registry">
+    Understand how features are registered and resolved
+  </Card>
+  
+  <Card title="Transporter" icon="network-wired" href="/concepts/transporter">
+    Configure WebSocket communication
+  </Card>
+</CardGroup>

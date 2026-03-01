@@ -1,0 +1,351 @@
+---
+title: Installation
+description: Set up your development environment for building Atomemo plugins
+---
+
+## Prerequisites
+
+Before installing the Atomemo Plugin SDK, ensure you have the following:
+
+<AccordionGroup>
+  <Accordion title="Bun Runtime" icon="javascript">
+    The SDK is optimized for Bun, a fast JavaScript runtime.
+    
+    **Install Bun:**
+    ```bash
+    curl -fsSL https://bun.sh/install | bash
+    ```
+    
+    **Verify installation:**
+    ```bash
+    bun --version
+    ```
+    
+    <Info>While Node.js 18+ is supported, Bun is recommended for the best performance and developer experience.</Info>
+  </Accordion>
+
+  <Accordion title="TypeScript (Optional)" icon="code">
+    TypeScript is recommended for type safety and better IDE support.
+    
+    The SDK includes TypeScript definitions, so no additional installation is needed.
+  </Accordion>
+
+  <Accordion title="Atomemo Hub Access" icon="server">
+    You'll need access to an Atomemo Hub instance for testing your plugin.
+    
+    Required environment variables:
+    - `HUB_WS_URL` - WebSocket URL of your Hub instance
+    - `HUB_DEBUG_API_KEY` - API key for debug mode (development only)
+  </Accordion>
+</AccordionGroup>
+
+## Install the SDK
+
+<Steps>
+  <Step title="Create a new project">
+    First, create a directory for your plugin:
+    
+    ```bash
+    mkdir my-atomemo-plugin
+    cd my-atomemo-plugin
+    ```
+  </Step>
+
+  <Step title="Initialize the project">
+    Initialize a new project with Bun:
+    
+    ```bash
+    bun init
+    ```
+    
+    This creates a `package.json` and basic project structure.
+  </Step>
+
+  <Step title="Install the SDK and dependencies">
+    Install the Atomemo Plugin SDK and required peer dependencies:
+    
+    <CodeGroup>
+    ```bash Bun
+    bun add @choiceopen/atomemo-plugin-sdk-js chalk dotenv zod
+    ```
+    
+    ```bash npm
+    npm install @choiceopen/atomemo-plugin-sdk-js chalk dotenv zod
+    ```
+    
+    ```bash pnpm
+    pnpm add @choiceopen/atomemo-plugin-sdk-js chalk dotenv zod
+    ```
+    
+    ```bash yarn
+    yarn add @choiceopen/atomemo-plugin-sdk-js chalk dotenv zod
+    ```
+    </CodeGroup>
+
+    <Note>
+      **Peer Dependencies:**
+      - `chalk` (v5) - Terminal styling
+      - `dotenv` (v17) - Environment variable management
+      - `zod` (v4) - Schema validation
+    </Note>
+  </Step>
+
+  <Step title="Install TypeScript types (if using TypeScript)">
+    If you're using TypeScript, install type definitions:
+    
+    ```bash
+    bun add -d typescript @types/bun
+    ```
+  </Step>
+</Steps>
+
+## Project Structure
+
+Set up your project with the following structure:
+
+```
+my-atomemo-plugin/
+├── src/
+│   └── index.ts          # Plugin entry point
+├── .env                   # Environment variables
+├── package.json
+├── tsconfig.json          # TypeScript configuration (if using TS)
+└── README.md
+```
+
+## Environment Configuration
+
+Create a `.env` file in your project root to configure the SDK:
+
+```bash .env
+# Hub connection
+HUB_WS_URL=wss://hub.atomemo.ai/socket
+HUB_DEBUG_API_KEY=your_debug_api_key_here
+
+# Runtime mode (debug or release)
+HUB_MODE=debug
+
+# Node environment
+NODE_ENV=development
+
+# Enable debug logging (optional)
+DEBUG=true
+```
+
+<Tabs>
+  <Tab title="Development">
+    For local development, use debug mode:
+    
+    ```bash
+    HUB_MODE=debug
+    NODE_ENV=development
+    DEBUG=true
+    HUB_DEBUG_API_KEY=your_debug_key
+    ```
+  </Tab>
+  
+  <Tab title="Production">
+    For production deployment, use release mode:
+    
+    ```bash
+    HUB_MODE=release
+    NODE_ENV=production
+    DEBUG=false
+    ```
+    
+    <Warning>
+      In release mode, the SDK reads plugin metadata from `definition.json`. Ensure this file is present and valid.
+    </Warning>
+  </Tab>
+</Tabs>
+
+## TypeScript Configuration
+
+If you're using TypeScript, create a `tsconfig.json`:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["bun"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
+```
+
+## Package.json Scripts
+
+Add these scripts to your `package.json` for development:
+
+```json package.json
+{
+  "name": "my-atomemo-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@choiceopen/atomemo-plugin-sdk-js": "^0.3.2",
+    "chalk": "^5.6.2",
+    "dotenv": "^17.3.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.9",
+    "typescript": "^5.9.3"
+  }
+}
+```
+
+## Verify Installation
+
+Create a minimal plugin to verify your setup:
+
+```typescript src/index.ts
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({
+  name: "test-plugin",
+  display_name: { en_US: "Test Plugin" },
+  description: { en_US: "Testing SDK installation" },
+  icon: "🔌",
+  locales: ["en_US"]
+})
+
+console.log("Plugin created successfully!")
+
+await plugin.run()
+```
+
+Run the plugin:
+
+```bash
+bun run dev
+```
+
+If everything is set up correctly, you should see:
+
+```
+Plugin created successfully!
+```
+
+<Check>
+  Your development environment is now ready! Proceed to the [quickstart guide](/quickstart) to build your first plugin.
+</Check>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Module not found errors">
+    Ensure all peer dependencies are installed:
+    
+    ```bash
+    bun add chalk dotenv zod
+    ```
+  </Accordion>
+
+  <Accordion title="WebSocket connection errors">
+    Verify your `HUB_WS_URL` is correct and the Hub instance is running:
+    
+    ```bash
+    echo $HUB_WS_URL
+    ```
+    
+    The URL should start with `ws://` or `wss://`.
+  </Accordion>
+
+  <Accordion title="Authentication errors in debug mode">
+    Make sure `HUB_DEBUG_API_KEY` is set in your `.env` file:
+    
+    ```bash
+    HUB_DEBUG_API_KEY=your_key_here
+    ```
+  </Accordion>
+
+  <Accordion title="TypeScript errors">
+    Run type checking to identify issues:
+    
+    ```bash
+    bun run typecheck
+    ```
+    
+    Ensure `@types/bun` is installed if you're using Bun-specific APIs.
+  </Accordion>
+
+  <Accordion title="Definition.json errors in release mode">
+    In release mode, the SDK expects a `definition.json` file with author information:
+    
+    ```json definition.json
+    {
+      "author": "Your Name",
+      "email": "your.email@example.com"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first working plugin
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/create-plugin">
+    Explore the complete SDK API
+  </Card>
+</CardGroup>
+
+## Optional: Biome for Linting
+
+The SDK uses Biome for linting and formatting. To use it in your project:
+
+```bash
+bun add -d @biomejs/biome
+```
+
+Create a `biome.json` configuration:
+
+```json biome.json
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
+  }
+}
+```
+
+Add scripts to `package.json`:
+
+```json
+{
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  }
+}
+```

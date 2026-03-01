@@ -1,0 +1,628 @@
+---
+title: "Adding Tools"
+description: "Learn how to add executable tools to your plugin"
+---
+
+Tools are the core executable functionality of your plugin. They define actions that can be invoked by the Atomemo platform.
+
+## What are Tools?
+
+Tools in Atomemo plugins are:
+
+- **Executable functions** that perform specific actions
+- **Invoked by the Hub Server** with parameters and credentials
+- **Return structured data** or error responses
+- **Type-safe** with Zod schema validation
+
+## Basic Tool Definition
+
+<Steps>
+  <Step title="Define the tool">
+    Create a tool with an `invoke` function:
+
+    ```typescript
+    plugin.addTool({
+      name: "send-message",
+      display_name: { en_US: "Send Message" },
+      description: { en_US: "Send a message to a channel" },
+      icon: "📨",
+      parameters: [
+        {
+          name: "channel",
+          display_name: { en_US: "Channel" },
+          description: { en_US: "Channel ID to send to" },
+          type: "string",
+          required: true,
+        },
+        {
+          name: "message",
+          display_name: { en_US: "Message" },
+          description: { en_US: "Message content" },
+          type: "string",
+          required: true,
+        },
+      ],
+      invoke: async ({ args }) => {
+        const { parameters } = args
+        
+        // Your tool implementation
+        const result = await sendMessage(
+          parameters.channel,
+          parameters.message
+        )
+        
+        return {
+          success: true,
+          message_id: result.id,
+        }
+      },
+    })
+    ```
+  </Step>
+
+  <Step title="Handle invocation">
+    When invoked, your tool receives parameters and credentials:
+
+    ```typescript
+    invoke: async ({ args }) => {
+      // args contains:
+      // - parameters: User-provided input
+      // - credentials: Authenticated credential data
+      
+      const { parameters, credentials } = args
+      
+      return { /* result */ }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Tool Structure
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Unique identifier (kebab-case) |
+| `display_name` | `Record<Locale, string>` | Human-readable name |
+| `description` | `Record<Locale, string>` | What this tool does |
+| `icon` | `string` | Visual identifier (emoji/icon) |
+| `parameters` | `Parameter[]` | Input fields for the tool |
+| `invoke` | `Function` | Async function that executes the tool |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `credentials` | `string[]` | Required credential names |
+| `returns` | `Parameter[]` | Output schema definition |
+| `examples` | `Example[]` | Usage examples |
+| `category` | `string` | Tool category for organization |
+
+## Invoke Function
+
+The `invoke` function is where your tool logic lives:
+
+```typescript
+invoke: async ({ args }) => {
+  // args.parameters: User input
+  // args.credentials: Authenticated credentials (if required)
+  
+  const { parameters, credentials } = args
+  
+  // Perform your tool's action
+  const result = await performAction(parameters)
+  
+  // Return structured data
+  return result
+}
+```
+
+### Invocation Flow
+
+When the Hub Server invokes your tool:
+
+<Steps>
+  <Step title="Hub sends invoke_tool message">
+    ```typescript
+    {
+      request_id: "req_123",
+      tool_name: "send-message",
+      parameters: { channel: "#general", message: "Hello" },
+      credentials: { "api-key": { key: "abc123" } }
+    }
+    ```
+  </Step>
+
+  <Step title="SDK resolves tool definition">
+    ```typescript
+    const definition = registry.resolve("tool", event.tool_name)
+    ```
+  </Step>
+
+  <Step title="SDK executes invoke function">
+    ```typescript
+    const data = await invoke({ 
+      args: { credentials, parameters } 
+    })
+    ```
+  </Step>
+
+  <Step title="SDK sends response">
+    ```typescript
+    channel.push("invoke_tool_response", {
+      request_id: "req_123",
+      data: { success: true, message_id: "msg_456" }
+    })
+    ```
+  </Step>
+</Steps>
+
+## Parameter Types
+
+Tools support various parameter types:
+
+### String Parameter
+
+```typescript
+{
+  name: "text",
+  display_name: { en_US: "Text" },
+  type: "string",
+  required: true,
+  placeholder: "Enter text...",
+}
+```
+
+### Number Parameter
+
+```typescript
+{
+  name: "count",
+  display_name: { en_US: "Count" },
+  type: "number",
+  required: false,
+  default: 10,
+  min: 1,
+  max: 100,
+}
+```
+
+### Boolean Parameter
+
+```typescript
+{
+  name: "enabled",
+  display_name: { en_US: "Enabled" },
+  type: "boolean",
+  required: false,
+  default: true,
+}
+```
+
+### Array Parameter
+
+```typescript
+{
+  name: "tags",
+  display_name: { en_US: "Tags" },
+  type: "array",
+  items: { type: "string" },
+  required: false,
+}
+```
+
+### Object Parameter
+
+```typescript
+{
+  name: "metadata",
+  display_name: { en_US: "Metadata" },
+  type: "object",
+  properties: {
+    author: { type: "string" },
+    timestamp: { type: "number" },
+  },
+  required: false,
+}
+```
+
+## Using Credentials
+
+Tools can require credentials for authentication:
+
+```typescript
+plugin.addTool({
+  name: "list-repos",
+  display_name: { en_US: "List Repositories" },
+  description: { en_US: "List GitHub repositories" },
+  icon: "📚",
+  credentials: ["github-token"], // Link credential
+  parameters: [
+    {
+      name: "username",
+      display_name: { en_US: "Username" },
+      type: "string",
+      required: true,
+    },
+  ],
+  invoke: async ({ args }) => {
+    const { parameters, credentials } = args
+    
+    // Access credential data
+    const token = credentials?.["github-token"]?.token
+    
+    if (!token) {
+      throw new Error("GitHub token not provided")
+    }
+    
+    // Use in API call
+    const response = await fetch(
+      `https://api.github.com/users/${parameters.username}/repos`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/vnd.github.v3+json",
+        },
+      }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.statusText}`)
+    }
+    
+    const repos = await response.json()
+    
+    return {
+      count: repos.length,
+      repositories: repos.map((r: any) => ({
+        name: r.name,
+        url: r.html_url,
+        stars: r.stargazers_count,
+      })),
+    }
+  },
+})
+```
+
+## Real-World Examples
+
+### Example 1: HTTP API Call
+
+```typescript
+plugin.addTool({
+  name: "get-weather",
+  display_name: { en_US: "Get Weather" },
+  description: { en_US: "Get current weather for a location" },
+  icon: "🌤️",
+  credentials: ["weather-api-key"],
+  parameters: [
+    {
+      name: "city",
+      display_name: { en_US: "City" },
+      description: { en_US: "City name" },
+      type: "string",
+      required: true,
+    },
+    {
+      name: "units",
+      display_name: { en_US: "Units" },
+      type: "string",
+      required: false,
+      default: "metric",
+      enum: ["metric", "imperial"],
+    },
+  ],
+  invoke: async ({ args }) => {
+    const { parameters, credentials } = args
+    const apiKey = credentials?.["weather-api-key"]?.api_key
+    
+    const url = new URL("https://api.openweathermap.org/data/2.5/weather")
+    url.searchParams.set("q", parameters.city)
+    url.searchParams.set("units", parameters.units || "metric")
+    url.searchParams.set("appid", apiKey)
+    
+    const response = await fetch(url.toString())
+    
+    if (!response.ok) {
+      throw new Error(`Weather API error: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    
+    return {
+      city: data.name,
+      temperature: data.main.temp,
+      condition: data.weather[0].description,
+      humidity: data.main.humidity,
+      wind_speed: data.wind.speed,
+    }
+  },
+})
+```
+
+### Example 2: Database Query
+
+```typescript
+plugin.addTool({
+  name: "query-users",
+  display_name: { en_US: "Query Users" },
+  description: { en_US: "Search users in database" },
+  icon: "👥",
+  credentials: ["database-credentials"],
+  parameters: [
+    {
+      name: "email_pattern",
+      display_name: { en_US: "Email Pattern" },
+      description: { en_US: "Email pattern to search (e.g., %@example.com)" },
+      type: "string",
+      required: false,
+    },
+    {
+      name: "limit",
+      display_name: { en_US: "Limit" },
+      type: "number",
+      required: false,
+      default: 100,
+      max: 1000,
+    },
+  ],
+  invoke: async ({ args }) => {
+    const { parameters, credentials } = args
+    const dbCreds = credentials?.["database-credentials"]
+    
+    // Initialize database client
+    const client = new DatabaseClient({
+      host: dbCreds.host,
+      port: dbCreds.port,
+      database: dbCreds.database,
+      username: dbCreds.username,
+      password: dbCreds.password,
+    })
+    
+    try {
+      await client.connect()
+      
+      let query = "SELECT id, email, name FROM users"
+      const params: any[] = []
+      
+      if (parameters.email_pattern) {
+        query += " WHERE email LIKE $1"
+        params.push(parameters.email_pattern)
+      }
+      
+      query += ` LIMIT ${parameters.limit || 100}`
+      
+      const result = await client.query(query, params)
+      
+      return {
+        count: result.rows.length,
+        users: result.rows,
+      }
+    } finally {
+      await client.disconnect()
+    }
+  },
+})
+```
+
+### Example 3: File Processing
+
+```typescript
+plugin.addTool({
+  name: "analyze-image",
+  display_name: { en_US: "Analyze Image" },
+  description: { en_US: "Analyze image and extract information" },
+  icon: "🖼️",
+  credentials: ["vision-api-key"],
+  parameters: [
+    {
+      name: "image_url",
+      display_name: { en_US: "Image URL" },
+      description: { en_US: "URL of the image to analyze" },
+      type: "string",
+      required: true,
+    },
+    {
+      name: "features",
+      display_name: { en_US: "Features" },
+      description: { en_US: "Features to detect" },
+      type: "array",
+      items: { type: "string", enum: ["labels", "text", "faces", "objects"] },
+      required: false,
+      default: ["labels"],
+    },
+  ],
+  invoke: async ({ args }) => {
+    const { parameters, credentials } = args
+    const apiKey = credentials?.["vision-api-key"]?.api_key
+    
+    // Download image
+    const imageResponse = await fetch(parameters.image_url)
+    if (!imageResponse.ok) {
+      throw new Error("Failed to download image")
+    }
+    const imageBuffer = await imageResponse.arrayBuffer()
+    
+    // Analyze with vision API
+    const response = await fetch("https://vision.googleapis.com/v1/images:annotate", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requests: [{
+          image: { content: Buffer.from(imageBuffer).toString("base64") },
+          features: parameters.features.map((f: string) => ({ type: f })),
+        }],
+      }),
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Vision API error: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    
+    return {
+      labels: data.responses[0].labelAnnotations || [],
+      text: data.responses[0].textAnnotations || [],
+      faces: data.responses[0].faceAnnotations || [],
+      objects: data.responses[0].localizedObjectAnnotations || [],
+    }
+  },
+})
+```
+
+## Error Handling
+
+Handle errors properly in your tools:
+
+```typescript
+invoke: async ({ args }) => {
+  try {
+    // Validate inputs
+    if (!args.parameters.email.includes("@")) {
+      throw new Error("Invalid email format")
+    }
+    
+    // Perform action
+    const result = await apiCall(args.parameters)
+    
+    return result
+  } catch (error) {
+    // Log error for debugging
+    console.error("Tool execution error:", error)
+    
+    // Re-throw with clear message
+    if (error instanceof Error) {
+      throw new Error(`Failed to execute tool: ${error.message}`)
+    }
+    
+    throw new Error("Unknown error occurred")
+  }
+}
+```
+
+The SDK automatically handles errors and sends them to the Hub Server:
+
+```typescript
+// Automatic error handling by SDK
+channel.push("invoke_tool_error", {
+  request_id: message.request_id,
+  message: error.message,
+  stack: error.stack,
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Validate inputs early">
+    ```typescript
+    invoke: async ({ args }) => {
+      const { parameters } = args
+      
+      if (!parameters.email.match(/^[^@]+@[^@]+$/)) {
+        throw new Error("Invalid email format")
+      }
+      
+      if (parameters.count < 1 || parameters.count > 1000) {
+        throw new Error("Count must be between 1 and 1000")
+      }
+      
+      // Continue with validated inputs
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Return structured data">
+    ```typescript
+    // Good: Consistent structure
+    return {
+      success: true,
+      data: { /* ... */ },
+      metadata: { timestamp: Date.now() },
+    }
+    
+    // Avoid: Inconsistent returns
+    if (success) return data
+    else return { error: "..." }
+    ```
+  </Accordion>
+
+  <Accordion title="Handle rate limits">
+    ```typescript
+    invoke: async ({ args }) => {
+      try {
+        const response = await fetch(url, options)
+        
+        if (response.status === 429) {
+          const retryAfter = response.headers.get("Retry-After")
+          throw new Error(`Rate limited. Retry after ${retryAfter} seconds`)
+        }
+        
+        return await response.json()
+      } catch (error) {
+        throw error
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Clean up resources">
+    ```typescript
+    invoke: async ({ args }) => {
+      const client = new Client()
+      
+      try {
+        await client.connect()
+        const result = await client.query()
+        return result
+      } finally {
+        // Always clean up
+        await client.disconnect()
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use descriptive error messages">
+    ```typescript
+    // Good
+    throw new Error("Failed to send email: SMTP server timeout after 30s")
+    
+    // Avoid
+    throw new Error("Error")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Tools
+
+Test your tools in debug mode:
+
+```typescript
+// Run your plugin
+bun run index.ts
+
+// In debug mode, the plugin:
+// 1. Connects to Hub Server
+// 2. Registers tool definitions
+// 3. Listens for invocations
+// 4. Logs all activity
+```
+
+See [Debug Mode](/guides/debug-mode) for detailed testing instructions.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Add Models" icon="brain" href="/guides/adding-models">
+    Integrate AI models into your plugin
+  </Card>
+  <Card title="Debug Mode" icon="bug" href="/guides/debug-mode">
+    Test and troubleshoot your tools
+  </Card>
+</CardGroup>

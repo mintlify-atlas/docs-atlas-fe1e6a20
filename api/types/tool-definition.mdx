@@ -1,0 +1,334 @@
+---
+title: ToolDefinition
+description: Type definition for tool configurations in Atomemo plugins
+---
+
+## Overview
+
+The `ToolDefinition` type defines executable tools that can be invoked by AI agents or users. Tools can accept parameters and credentials, and return results.
+
+## Type Definition
+
+```typescript
+type ToolDefinition = {
+  name: string
+  display_name: Record<string, string>
+  description: Record<string, string>
+  icon: string
+  parameters: ParameterDefinition[]
+  credentials?: string[]
+  invoke: (args: {
+    parameters: Record<string, any>
+    credentials?: Record<string, any>
+  }) => Promise<any> | any
+}
+```
+
+## Properties
+
+<ParamField path="name" type="string" required>
+  The unique identifier for the tool.
+  
+  **Example:** `"send-email"` or `"get-weather"`
+</ParamField>
+
+<ParamField path="display_name" type="Record<string, string>" required>
+  Localized display names for the tool.
+  
+  **Example:**
+  ```typescript
+  {
+    en_US: "Send Email",
+    es_ES: "Enviar Correo"
+  }
+  ```
+</ParamField>
+
+<ParamField path="description" type="Record<string, string>" required>
+  Localized descriptions explaining what the tool does.
+  
+  **Example:**
+  ```typescript
+  {
+    en_US: "Send an email to a recipient",
+    es_ES: "Enviar un correo electrónico a un destinatario"
+  }
+  ```
+</ParamField>
+
+<ParamField path="icon" type="string" required>
+  An emoji or icon representing the tool.
+  
+  **Example:** `"📧"` or `"🛠️"`
+</ParamField>
+
+<ParamField path="parameters" type="ParameterDefinition[]" required>
+  An array of parameter definitions that describe the inputs this tool accepts.
+  
+  **Example:**
+  ```typescript
+  [
+    {
+      name: "recipient",
+      display_name: { en_US: "Recipient" },
+      description: { en_US: "Email address of the recipient" },
+      type: "string",
+      required: true
+    },
+    {
+      name: "subject",
+      display_name: { en_US: "Subject" },
+      description: { en_US: "Email subject line" },
+      type: "string",
+      required: true
+    },
+    {
+      name: "body",
+      display_name: { en_US: "Body" },
+      description: { en_US: "Email message body" },
+      type: "string",
+      required: true
+    }
+  ]
+  ```
+</ParamField>
+
+<ParamField path="credentials" type="string[]">
+  Optional array of credential names that this tool requires. The credentials must be registered with the plugin using `addCredential()`.
+  
+  **Example:** `["api-key"]` or `["oauth-token"]`
+</ParamField>
+
+<ParamField path="invoke" type="function" required>
+  The function that executes when the tool is invoked. Must be async or return a Promise.
+  
+  **Parameters:**
+  - `args.parameters` - The parameter values provided by the user or AI agent
+  - `args.credentials` - The credential values (if specified in the `credentials` property)
+  
+  **Returns:** The result of the tool execution. Can be any JSON-serializable value.
+  
+  **Example:**
+  ```typescript
+  invoke: async ({ parameters, credentials }) => {
+    const response = await fetch("https://api.example.com/send", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${credentials?.api_key}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        to: parameters.recipient,
+        subject: parameters.subject,
+        body: parameters.body
+      })
+    })
+    
+    return {
+      success: response.ok,
+      message_id: await response.json().message_id
+    }
+  }
+  ```
+</ParamField>
+
+## Usage
+
+Tools are registered using the `addTool()` method on the plugin instance:
+
+```typescript
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({
+  name: "email-plugin",
+  display_name: { en_US: "Email Plugin" },
+  description: { en_US: "Send and manage emails" },
+  icon: "📧",
+  locales: ["en_US"]
+})
+
+plugin.addTool({
+  name: "send-email",
+  display_name: {
+    en_US: "Send Email"
+  },
+  description: {
+    en_US: "Send an email to a recipient"
+  },
+  icon: "📧",
+  parameters: [
+    {
+      name: "recipient",
+      display_name: { en_US: "Recipient" },
+      description: { en_US: "Email address" },
+      type: "string",
+      required: true
+    },
+    {
+      name: "subject",
+      display_name: { en_US: "Subject" },
+      description: { en_US: "Email subject" },
+      type: "string",
+      required: true
+    },
+    {
+      name: "body",
+      display_name: { en_US: "Body" },
+      description: { en_US: "Email body" },
+      type: "string",
+      required: true
+    }
+  ],
+  credentials: ["api-key"],
+  invoke: async ({ parameters, credentials }) => {
+    // Send the email
+    const response = await fetch("https://api.email.com/send", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${credentials.api_key}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(parameters)
+    })
+    
+    return {
+      success: response.ok,
+      message_id: (await response.json()).id
+    }
+  }
+})
+```
+
+## Tool Execution Flow
+
+1. User or AI agent invokes the tool with parameters
+2. The Hub Server validates the parameters against the schema
+3. If credentials are required, they are retrieved and included
+4. The `invoke` function is called with parameters and credentials
+5. The function executes and returns a result
+6. The result is sent back to the caller
+7. If an error occurs, it's caught and returned to the caller
+
+## Error Handling
+
+The SDK automatically catches errors thrown in the `invoke` function:
+
+```typescript
+plugin.addTool({
+  name: "risky-operation",
+  display_name: { en_US: "Risky Operation" },
+  description: { en_US: "An operation that might fail" },
+  icon: "⚠️",
+  parameters: [],
+  invoke: async () => {
+    // Errors are automatically caught and sent to the Hub
+    throw new Error("Something went wrong")
+  }
+})
+```
+
+The error is automatically sent to the Hub Server as an `invoke_tool_error` message.
+
+## Example: Tool with Multiple Parameters
+
+```typescript
+plugin.addTool({
+  name: "create-task",
+  display_name: {
+    en_US: "Create Task"
+  },
+  description: {
+    en_US: "Create a new task with title, description, and due date"
+  },
+  icon: "✅",
+  parameters: [
+    {
+      name: "title",
+      display_name: { en_US: "Title" },
+      description: { en_US: "Task title" },
+      type: "string",
+      required: true
+    },
+    {
+      name: "description",
+      display_name: { en_US: "Description" },
+      description: { en_US: "Task description" },
+      type: "string",
+      required: false
+    },
+    {
+      name: "due_date",
+      display_name: { en_US: "Due Date" },
+      description: { en_US: "Task due date" },
+      type: "string",
+      required: false
+    },
+    {
+      name: "priority",
+      display_name: { en_US: "Priority" },
+      description: { en_US: "Task priority level" },
+      type: "number",
+      required: false
+    }
+  ],
+  invoke: async ({ parameters }) => {
+    // Create the task
+    const task = {
+      id: crypto.randomUUID(),
+      title: parameters.title,
+      description: parameters.description || "",
+      due_date: parameters.due_date || null,
+      priority: parameters.priority || 0,
+      created_at: new Date().toISOString()
+    }
+    
+    return {
+      success: true,
+      task
+    }
+  }
+})
+```
+
+## Example: Tool Without Credentials
+
+```typescript
+plugin.addTool({
+  name: "get-weather",
+  display_name: {
+    en_US: "Get Weather"
+  },
+  description: {
+    en_US: "Get current weather information for a location"
+  },
+  icon: "☁️",
+  parameters: [
+    {
+      name: "location",
+      display_name: { en_US: "Location" },
+      description: { en_US: "City name or coordinates" },
+      type: "string",
+      required: true
+    }
+  ],
+  invoke: async ({ parameters }) => {
+    // Fetch weather data (no credentials needed for public API)
+    const response = await fetch(
+      `https://api.weather.com/public?location=${encodeURIComponent(parameters.location)}`
+    )
+    
+    return await response.json()
+  }
+})
+```
+
+## Related Types
+
+- [CredentialDefinition](/api/types/credential-definition) - Credentials used by tools
+- [PluginDefinition](/api/types/plugin-definition) - Parent plugin configuration
+
+## See Also
+
+- [Adding Tools](/guides/adding-tools) - Step-by-step guide
+- [Plugin Instance](/api/plugin-instance) - The `addTool()` method
+- [Tool with Credentials Example](/examples/tool-with-credentials)

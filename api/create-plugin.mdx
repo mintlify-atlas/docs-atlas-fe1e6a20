@@ -1,0 +1,144 @@
+---
+title: 'createPlugin'
+description: 'Creates a new plugin instance with the specified configuration options'
+---
+
+## Function Signature
+
+```typescript
+async function createPlugin<Locales extends string[]>(
+  options: PluginDefinition<Locales, TransporterOptions>
+): Promise<PluginInstance>
+```
+
+## Description
+
+Creates a new plugin instance with the specified options. This is the main entry point for building Atomemo plugins. The function handles authentication, plugin registration, and returns an instance object with methods to add credentials, tools, models, and run the plugin.
+
+## Parameters
+
+<ParamField path="options" type="PluginDefinition<Locales, TransporterOptions>" required>
+  The plugin configuration object containing metadata and settings.
+  
+  <Expandable title="properties">
+    <ParamField path="name" type="string" required>
+      The unique name of the plugin
+    </ParamField>
+    
+    <ParamField path="description" type="string" required>
+      A description of what the plugin does
+    </ParamField>
+    
+    <ParamField path="version" type="string">
+      The plugin version. Defaults to `process.env.npm_package_version` if not provided
+    </ParamField>
+    
+    <ParamField path="author" type="string">
+      Plugin author name. Automatically populated from user session in debug mode or from `definition.json` in release mode
+    </ParamField>
+    
+    <ParamField path="email" type="string">
+      Plugin author email. Automatically populated from user session in debug mode or from `definition.json` in release mode
+    </ParamField>
+    
+    <ParamField path="transporterOptions" type="TransporterOptions">
+      Optional configuration for the network transporter
+      
+      <Expandable title="properties">
+        <ParamField path="heartbeatIntervalMs" type="number">
+          Interval in milliseconds for heartbeat messages. Defaults to 30000 (30 seconds)
+        </ParamField>
+        
+        <ParamField path="onOpen" type="() => void">
+          Callback function invoked when the socket connection opens
+        </ParamField>
+        
+        <ParamField path="onClose" type="(event: CloseEvent) => void">
+          Callback function invoked when the socket connection closes
+        </ParamField>
+        
+        <ParamField path="onError" type="(error: Error, transport: string, establishedConnections: number) => void">
+          Callback function invoked when a socket error occurs
+        </ParamField>
+        
+        <ParamField path="onMessage" type="(message: any) => void">
+          Callback function invoked when a message is received
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Returns
+
+<ResponseField name="PluginInstance" type="object">
+  An object containing methods to configure and run the plugin
+  
+  <Expandable title="methods">
+    <ResponseField name="addCredential" type="(credential: CredentialDefinition) => void">
+      Adds a credential definition to the plugin registry
+    </ResponseField>
+    
+    <ResponseField name="addTool" type="(tool: ToolDefinition) => void">
+      Adds a tool definition to the plugin registry
+    </ResponseField>
+    
+    <ResponseField name="addModel" type="(model: ModelDefinition) => void">
+      Adds a model definition to the plugin registry
+    </ResponseField>
+    
+    <ResponseField name="run" type="() => Promise<void>">
+      Starts the plugin's main process, establishes the transporter connection, and sets up signal handlers for graceful shutdown
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```typescript
+import { createPlugin } from '@choiceopen/atomemo-plugin-sdk'
+
+const plugin = await createPlugin({
+  name: 'my-awesome-plugin',
+  description: 'A plugin that does amazing things',
+  version: '1.0.0',
+  transporterOptions: {
+    heartbeatIntervalMs: 30000,
+    onOpen: () => console.log('Connected to Hub'),
+    onError: (error) => console.error('Connection error:', error)
+  }
+})
+
+// Add plugin features
+plugin.addTool(myToolDefinition)
+plugin.addCredential(myCredentialDefinition)
+
+// Start the plugin
+await plugin.run()
+```
+
+## Behavior
+
+### Debug Mode
+
+When `HUB_MODE` environment variable is set to `"debug"`:
+- Fetches user information from OneAuth session
+- Registers the plugin with the Hub using `register_plugin` message
+- Writes the plugin definition to `definition.json`
+- Uses debug topic: `debug_plugin:{plugin.name}`
+
+### Release Mode
+
+When `HUB_MODE` is not `"debug"`:
+- Reads user information from `definition.json` file
+- Uses release topic: `release_plugin:{plugin.name}__{HUB_MODE}__{version}`
+
+### Signal Handling
+
+The plugin automatically sets up handlers for `SIGINT` and `SIGTERM` signals to gracefully shut down the connection when the process is terminated.
+
+## Error Handling
+
+- Throws error if user session cannot be fetched in debug mode
+- Throws error if `definition.json` cannot be parsed in release mode
+- Exits process with code 1 on authentication or definition errors

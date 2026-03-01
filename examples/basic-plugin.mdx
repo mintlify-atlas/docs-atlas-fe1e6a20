@@ -1,0 +1,203 @@
+---
+title: "Basic Plugin"
+description: "Create a simple plugin with a basic tool"
+---
+
+This example demonstrates how to create a basic Atomemo plugin with a simple tool that performs a calculation.
+
+## Overview
+
+You'll learn how to:
+- Initialize a plugin with `createPlugin()`
+- Define a basic tool using `addTool()`
+- Implement the tool's `invoke` function
+- Run the plugin process
+
+## Complete Example
+
+```typescript index.ts
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js";
+import { z } from "zod";
+
+const plugin = await createPlugin({
+  name: "math-toolkit",
+  display_name: { en_US: "Math Toolkit" },
+  description: { en_US: "A simple plugin with basic math operations" },
+  icon: "🔢",
+  locales: ["en_US"],
+});
+
+// Define a calculator tool
+plugin.addTool({
+  name: "calculate",
+  display_name: { en_US: "Calculate" },
+  description: { en_US: "Perform basic arithmetic calculations" },
+  icon: "🧮",
+  parameters: [
+    {
+      name: "operation",
+      display_name: { en_US: "Operation" },
+      description: { en_US: "The arithmetic operation to perform" },
+      type: "string",
+      required: true,
+      enum: ["add", "subtract", "multiply", "divide"],
+    },
+    {
+      name: "a",
+      display_name: { en_US: "First Number" },
+      description: { en_US: "The first operand" },
+      type: "number",
+      required: true,
+    },
+    {
+      name: "b",
+      display_name: { en_US: "Second Number" },
+      description: { en_US: "The second operand" },
+      type: "number",
+      required: true,
+    },
+  ],
+  invoke: async ({ args }) => {
+    const { operation, a, b } = args.parameters;
+
+    let result: number;
+    switch (operation) {
+      case "add":
+        result = a + b;
+        break;
+      case "subtract":
+        result = a - b;
+        break;
+      case "multiply":
+        result = a * b;
+        break;
+      case "divide":
+        if (b === 0) {
+          throw new Error("Cannot divide by zero");
+        }
+        result = a / b;
+        break;
+      default:
+        throw new Error(`Unknown operation: ${operation}`);
+    }
+
+    return {
+      result,
+      message: `${a} ${operation} ${b} = ${result}`,
+    };
+  },
+});
+
+// Start the plugin process
+await plugin.run();
+```
+
+## Code Breakdown
+
+### Plugin Initialization
+
+The plugin is created using `createPlugin()` with metadata:
+
+```typescript
+const plugin = await createPlugin({
+  name: "math-toolkit",              // Unique plugin identifier
+  display_name: { en_US: "Math Toolkit" },  // Human-readable name
+  description: { en_US: "A simple plugin..." },
+  icon: "🔢",                       // Plugin icon (emoji or URL)
+  locales: ["en_US"],               // Supported locales
+});
+```
+
+<Note>
+The `createPlugin()` function is async because it fetches user session information in debug mode.
+</Note>
+
+### Tool Definition
+
+Tools are defined with:
+- **Metadata**: Name, display name, description, and icon
+- **Parameters**: Input schema with type validation
+- **Invoke function**: The actual implementation
+
+```typescript
+plugin.addTool({
+  name: "calculate",
+  // ... metadata
+  parameters: [
+    {
+      name: "operation",
+      type: "string",
+      required: true,
+      enum: ["add", "subtract", "multiply", "divide"],
+    },
+    // ... more parameters
+  ],
+  invoke: async ({ args }) => {
+    // Implementation here
+  },
+});
+```
+
+### Invoke Function
+
+The `invoke` function receives an object with:
+- `args.parameters`: The input parameters from the user
+- `args.credentials`: Any credentials needed (see [tool-with-credentials](/examples/tool-with-credentials))
+
+```typescript
+invoke: async ({ args }) => {
+  const { operation, a, b } = args.parameters;
+  // Perform the operation and return results
+  return { result, message };
+}
+```
+
+### Running the Plugin
+
+The `run()` method starts the plugin process:
+
+```typescript
+await plugin.run();
+```
+
+This:
+1. Establishes a connection with the Atomemo platform
+2. Registers the plugin and its tools
+3. Listens for tool invocation requests
+4. Handles graceful shutdown on SIGINT/SIGTERM
+
+## Running the Plugin
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    bun install
+    ```
+  </Step>
+  
+  <Step title="Set up environment">
+    Create a `.env` file with the required configuration:
+    ```bash
+    HUB_MODE=debug
+    HUB_WS_URL=wss://api.atomemo.ai/socket
+    ```
+  </Step>
+  
+  <Step title="Run the plugin">
+    ```bash
+    bun run index.ts
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tool with Credentials" icon="key" href="/examples/tool-with-credentials">
+    Learn how to add authentication to your tools
+  </Card>
+  
+  <Card title="Custom Model" icon="brain" href="/examples/custom-model">
+    Add custom AI models to your plugin
+  </Card>
+</CardGroup>

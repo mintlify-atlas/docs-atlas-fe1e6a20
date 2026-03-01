@@ -1,0 +1,640 @@
+---
+title: "Debug Mode"
+description: "Test and troubleshoot your plugin during development"
+---
+
+Debug mode provides a development-friendly environment for testing your plugin with live connection to the Hub Server.
+
+## What is Debug Mode?
+
+Debug mode is a special runtime mode that:
+
+- **Connects directly to Hub Server** for real-time testing
+- **Dynamically registers** your plugin without deployment
+- **Authenticates via OneAuth** to fetch author information
+- **Generates `definition.json`** for inspection
+- **Provides verbose logging** for troubleshooting
+
+## Enabling Debug Mode
+
+Debug mode is enabled by default. Configure it via environment variables:
+
+```bash
+# .env
+HUB_MODE=debug
+HUB_WS_URL=wss://hub.atomemo.ai
+HUB_DEBUG_API_KEY=your_api_key_here
+DEBUG=true
+NODE_ENV=development
+```
+
+<Note>
+  `HUB_MODE=debug` is the default value, so you can omit it from `.env`.
+</Note>
+
+## Debug Mode Features
+
+### Dynamic Registration
+
+Your plugin registers automatically when started:
+
+<Steps>
+  <Step title="Start your plugin">
+    ```bash
+    bun run index.ts
+    ```
+  </Step>
+
+  <Step title="SDK connects to Hub Server">
+    ```
+    [2024-03-01 10:00:00] OPEN Connection established
+    [2024-03-01 10:00:01] JOINED Joined debug_plugin:my-plugin successfully
+    ```
+  </Step>
+
+  <Step title="Plugin definition sent to Hub">
+    ```typescript
+    channel.push("register_plugin", {
+      name: "my-plugin",
+      display_name: { en_US: "My Plugin" },
+      credentials: [...],
+      tools: [...],
+      models: [...],
+    })
+    ```
+  </Step>
+
+  <Step title="definition.json written to disk">
+    ```json
+    {
+      "name": "my-plugin",
+      "author": "Your Name",
+      "email": "you@example.com",
+      "version": "0.1.0",
+      "credentials": [...],
+      "tools": [...],
+      "models": [...]
+    }
+    ```
+  </Step>
+</Steps>
+
+### Author Authentication
+
+In debug mode, author information comes from OneAuth:
+
+```typescript
+// SDK automatically fetches from OneAuth API
+const deployment = env.HUB_WS_URL.includes("atomemo.ai") 
+  ? "production" 
+  : "staging"
+
+const session = await getSession(deployment)
+user = { 
+  name: session.user.name, 
+  email: session.user.email 
+}
+```
+
+**Requirements:**
+- Valid `HUB_DEBUG_API_KEY` in environment
+- Active session in `~/.choiceform/atomemo.json`
+- Network access to OneAuth API
+
+### Channel Naming
+
+Debug mode uses a simple channel name:
+
+```typescript
+const topic = `debug_plugin:${plugin.name}`
+// Example: "debug_plugin:my-plugin"
+```
+
+Compare with release mode:
+
+```typescript
+const topic = `release_plugin:${plugin.name}__${mode}__${version}`
+// Example: "release_plugin:my-plugin__production__1.0.0"
+```
+
+### Verbose Logging
+
+With `DEBUG=true`, the SDK logs all events:
+
+```
+[2024-03-01 10:00:00] OPEN Connection established
+[2024-03-01 10:00:01] JOINED Joined debug_plugin:my-plugin successfully
+[2024-03-01 10:00:05] INVOKE_TOOL Received tool invocation
+{
+  request_id: "req_123",
+  tool_name: "send-message",
+  parameters: { channel: "#general", message: "Hello" }
+}
+[2024-03-01 10:00:06] INVOKE_TOOL_RESPONSE Tool invocation completed
+{
+  request_id: "req_123",
+  data: { success: true, message_id: "msg_456" }
+}
+```
+
+## Testing Workflow
+
+### Testing Credentials
+
+<Steps>
+  <Step title="Add credential to plugin">
+    ```typescript
+    plugin.addCredential({
+      name: "api-key",
+      display_name: { en_US: "API Key" },
+      // ...
+      authenticate: async ({ args }) => {
+        console.log("Authenticating:", args.credential)
+        // Validation logic
+        return { valid: true }
+      },
+    })
+    ```
+  </Step>
+
+  <Step title="Start plugin in debug mode">
+    ```bash
+    bun run index.ts
+    ```
+  </Step>
+
+  <Step title="Trigger authentication from Hub UI">
+    The Hub Server will send a `credential_auth_spec` message:
+    ```
+    [2024-03-01 10:01:00] CREDENTIAL_AUTH_SPEC Received auth request
+    Authenticating: { key: "test_key_123" }
+    ```
+  </Step>
+
+  <Step title="Verify response">
+    ```
+    [2024-03-01 10:01:01] CREDENTIAL_AUTH_SPEC_RESPONSE Auth successful
+    { valid: true }
+    ```
+  </Step>
+</Steps>
+
+### Testing Tools
+
+<Steps>
+  <Step title="Add tool to plugin">
+    ```typescript
+    plugin.addTool({
+      name: "fetch-data",
+      display_name: { en_US: "Fetch Data" },
+      // ...
+      invoke: async ({ args }) => {
+        console.log("Tool invoked with:", args.parameters)
+        const result = await fetchData(args.parameters)
+        console.log("Returning:", result)
+        return result
+      },
+    })
+    ```
+  </Step>
+
+  <Step title="Start plugin and watch logs">
+    ```bash
+    bun run index.ts
+    ```
+  </Step>
+
+  <Step title="Invoke tool from Hub UI">
+    ```
+    [2024-03-01 10:02:00] INVOKE_TOOL Received invocation
+    Tool invoked with: { query: "test" }
+    Fetching data...
+    Returning: { count: 5, items: [...] }
+    [2024-03-01 10:02:01] INVOKE_TOOL_RESPONSE Sent response
+    ```
+  </Step>
+</Steps>
+
+### Testing Models
+
+Models are registered but not directly invoked:
+
+<Steps>
+  <Step title="Add model to plugin">
+    ```typescript
+    plugin.addModel({
+      name: "openai/gpt-4",
+      display_name: { en_US: "GPT-4" },
+      // ...
+    })
+    ```
+  </Step>
+
+  <Step title="Inspect definition.json">
+    ```json
+    {
+      "models": [
+        {
+          "name": "openai/gpt-4",
+          "display_name": { "en_US": "GPT-4" },
+          "model_type": "llm",
+          "input_modalities": ["text"],
+          "output_modalities": ["text"]
+        }
+      ]
+    }
+    ```
+  </Step>
+
+  <Step title="Verify in Hub UI">
+    Check that the model appears in the model selection dropdown.
+  </Step>
+</Steps>
+
+## Inspecting definition.json
+
+The generated `definition.json` shows your plugin's serialized state:
+
+```json
+{
+  "name": "my-plugin",
+  "display_name": { "en_US": "My Plugin" },
+  "description": { "en_US": "A sample plugin" },
+  "icon": "🔌",
+  "author": "Your Name",
+  "email": "you@example.com",
+  "version": "0.1.0",
+  "locales": ["en_US"],
+  "credentials": [
+    {
+      "name": "api-key",
+      "display_name": { "en_US": "API Key" },
+      "description": { "en_US": "Your API key" },
+      "icon": "🔑",
+      "parameters": [
+        {
+          "name": "key",
+          "display_name": { "en_US": "Key" },
+          "type": "string",
+          "required": true,
+          "secret": true
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "send-message",
+      "display_name": { "en_US": "Send Message" },
+      "description": { "en_US": "Send a message" },
+      "icon": "📨",
+      "parameters": [...],
+      // Note: `invoke` function is NOT included
+    }
+  ],
+  "models": [...]
+}
+```
+
+<Note>
+  Function properties like `invoke` and `authenticate` are excluded from serialization.
+</Note>
+
+## Debug API Key Management
+
+### Obtaining a Debug API Key
+
+```bash
+# Using Atomemo CLI
+atomemo plugin refresh-key
+```
+
+This updates `~/.choiceform/atomemo.json`:
+
+```json
+{
+  "auth": {
+    "production": {
+      "access_token": "your_access_token"
+    }
+  }
+}
+```
+
+### Key Expiration
+
+Debug API keys expire after a period. If you see:
+
+```
+Error: Can't connect to the Plugin Hub server.
+
+This is usually because the Debug API Key is missing or has expired.
+
+Run `atomemo plugin refresh-key` to get a new key.
+```
+
+Refresh your key:
+
+```bash
+atomemo plugin refresh-key
+```
+
+## Troubleshooting
+
+### Connection Issues
+
+**Problem:** Plugin can't connect to Hub Server
+
+**Solutions:**
+
+<AccordionGroup>
+  <Accordion title="Verify HUB_WS_URL">
+    ```bash
+    echo $HUB_WS_URL
+    # Should be: wss://hub.atomemo.ai
+    ```
+  </Accordion>
+
+  <Accordion title="Check API key">
+    ```bash
+    # Refresh key
+    atomemo plugin refresh-key
+    
+    # Verify in .env
+    grep HUB_DEBUG_API_KEY .env
+    ```
+  </Accordion>
+
+  <Accordion title="Test network connectivity">
+    ```bash
+    curl -I https://hub.atomemo.ai
+    # Should return 200 OK
+    ```
+  </Accordion>
+
+  <Accordion title="Enable debug logging">
+    ```bash
+    # .env
+    DEBUG=true
+    
+    # Restart plugin and check logs
+    bun run index.ts
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Authentication Errors
+
+**Problem:** Failed to fetch user session
+
+**Solutions:**
+
+```bash
+# Check OneAuth config
+cat ~/.choiceform/atomemo.json
+
+# Verify access token exists
+jq '.auth.production.access_token' ~/.choiceform/atomemo.json
+
+# Re-authenticate
+atomemo login
+```
+
+### Registration Errors
+
+**Problem:** Plugin definition rejected
+
+**Check your definition:**
+
+```typescript
+// Missing required fields?
+const plugin = await createPlugin({
+  name: "my-plugin",
+  display_name: { en_US: "My Plugin" },  // Required
+  description: { en_US: "Description" }, // Required
+  icon: "🔌",                             // Required
+  locales: ["en_US"],                    // Required
+})
+```
+
+**Validate with Zod:**
+
+```bash
+# Check definition.json
+cat definition.json | jq .
+
+# Look for Zod validation errors in logs
+bun run index.ts 2>&1 | grep -i "validation"
+```
+
+### Tool Invocation Errors
+
+**Problem:** Tool fails when invoked
+
+**Debug steps:**
+
+<Steps>
+  <Step title="Add logging">
+    ```typescript
+    invoke: async ({ args }) => {
+      console.log("Args received:", JSON.stringify(args, null, 2))
+      
+      try {
+        const result = await performAction(args.parameters)
+        console.log("Success:", result)
+        return result
+      } catch (error) {
+        console.error("Error:", error)
+        throw error
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Check parameter types">
+    ```typescript
+    // Validate parameters
+    if (typeof args.parameters.count !== "number") {
+      throw new Error(`Expected number, got ${typeof args.parameters.count}`)
+    }
+    ```
+  </Step>
+
+  <Step title="Verify credentials">
+    ```typescript
+    const apiKey = args.credentials?.["api-key"]?.key
+    
+    if (!apiKey) {
+      console.error("Credentials:", args.credentials)
+      throw new Error("API key not provided")
+    }
+    
+    console.log("Using API key:", apiKey.slice(0, 10) + "...")
+    ```
+  </Step>
+
+  <Step title="Test independently">
+    ```typescript
+    // Create standalone test
+    async function testTool() {
+      const result = await invoke({
+        args: {
+          parameters: { test: "value" },
+          credentials: { "api-key": { key: "test_key" } },
+        },
+      })
+      console.log("Test result:", result)
+    }
+    
+    testTool()
+    ```
+  </Step>
+</Steps>
+
+## Hot Reload
+
+Debug mode supports hot reloading:
+
+<Steps>
+  <Step title="Make changes to your plugin">
+    ```typescript
+    // Update tool implementation
+    plugin.addTool({
+      name: "my-tool",
+      invoke: async ({ args }) => {
+        // New implementation
+        return { updated: true }
+      },
+    })
+    ```
+  </Step>
+
+  <Step title="Stop the plugin">
+    Press `Ctrl+C` to stop the running process.
+  </Step>
+
+  <Step title="Restart the plugin">
+    ```bash
+    bun run index.ts
+    ```
+  </Step>
+
+  <Step title="Plugin re-registers automatically">
+    ```
+    [2024-03-01 10:05:00] OPEN Connection established
+    [2024-03-01 10:05:01] JOINED Re-joined debug_plugin:my-plugin
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  Use a process manager like `nodemon` or `bun --watch` for automatic restarts:
+  
+  ```bash
+  bun --watch index.ts
+  ```
+</Tip>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use descriptive logs">
+    ```typescript
+    console.log(`[${new Date().toISOString()}] Tool invoked: ${args.parameters}`)
+    ```
+  </Accordion>
+
+  <Accordion title="Test edge cases">
+    ```typescript
+    invoke: async ({ args }) => {
+      // Test with missing parameters
+      // Test with invalid credentials
+      // Test with network failures
+      // Test with rate limits
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Inspect definition.json">
+    ```bash
+    # Check generated definition
+    cat definition.json | jq '.tools[] | {name, parameters}'
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor Hub Server logs">
+    Watch for errors in the Hub Server UI or logs.
+  </Accordion>
+
+  <Accordion title="Version your .env">
+    ```bash
+    # .env.example
+    HUB_MODE=debug
+    HUB_WS_URL=wss://hub.atomemo.ai
+    HUB_DEBUG_API_KEY=your_api_key_here
+    DEBUG=true
+    NODE_ENV=development
+    ```
+    Commit `.env.example` to help other developers.
+  </Accordion>
+</AccordionGroup>
+
+## Transitioning to Release Mode
+
+When ready for production:
+
+<Steps>
+  <Step title="Update environment variables">
+    ```bash
+    # .env
+    HUB_MODE=release
+    NODE_ENV=production
+    DEBUG=false
+    # Remove HUB_DEBUG_API_KEY
+    ```
+  </Step>
+
+  <Step title="Ensure definition.json exists">
+    ```bash
+    # Should exist from debug mode
+    ls -la definition.json
+    ```
+  </Step>
+
+  <Step title="Add author info to definition.json">
+    ```json
+    {
+      "author": "Your Name",
+      "email": "you@example.com",
+      "version": "1.0.0",
+      // ...
+    }
+    ```
+  </Step>
+
+  <Step title="Test in release mode">
+    ```bash
+    bun run index.ts
+    ```
+    
+    The plugin will:
+    - Read `definition.json` for author info
+    - Connect to release channel
+    - Not send registration message
+  </Step>
+</Steps>
+
+<Warning>
+  In release mode, changes to your plugin code won't automatically update the Hub Server. You'll need to redeploy or manually update the registration.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Setup" icon="gear" href="/guides/environment-setup">
+    Learn about all environment variables
+  </Card>
+  <Card title="Creating a Plugin" icon="plug" href="/guides/creating-a-plugin">
+    Build your first plugin
+  </Card>
+</CardGroup>

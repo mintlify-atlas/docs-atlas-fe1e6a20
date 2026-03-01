@@ -1,0 +1,446 @@
+---
+title: "Models"
+description: "Defining AI models and their capabilities in your plugin"
+---
+
+## Overview
+
+Models represent AI models (like language models, vision models, or embedding models) that your plugin provides access to. Model definitions describe the model's capabilities, input/output modalities, and configuration options.
+
+## Defining Models
+
+Use the `addModel` method to register a model definition:
+
+```typescript
+plugin.addModel({
+  name: "gpt-4-turbo",
+  display_name: { 
+    en_US: "GPT-4 Turbo" 
+  },
+  description: { 
+    en_US: "OpenAI's most capable and cost-effective model" 
+  },
+  model_type: "llm",
+  input_modality: ["text"],
+  output_modality: ["text"],
+  credentials: ["openai_api_key"],
+  properties: {
+    max_tokens: 128000,
+    supports_streaming: true,
+    supports_function_calling: true,
+    supports_vision: false
+  }
+})
+```
+
+## Model Schema
+
+<ResponseField name="name" type="string" required>
+  Unique identifier for the model. Often matches the model ID used by the provider's API.
+</ResponseField>
+
+<ResponseField name="display_name" type="object" required>
+  Localized display names shown to users in the UI.
+</ResponseField>
+
+<ResponseField name="description" type="object" required>
+  Localized descriptions explaining the model's capabilities and use cases.
+</ResponseField>
+
+<ResponseField name="model_type" type="string" required>
+  The type of model. Common values include:
+  - `"llm"` - Large Language Model
+  - `"embedding"` - Embedding Model
+  - `"vision"` - Vision Model
+  - `"audio"` - Audio Model
+  - `"multimodal"` - Multimodal Model
+</ResponseField>
+
+<ResponseField name="input_modality" type="string[]">
+  Array of supported input modalities: `"text"`, `"image"`, `"audio"`, `"video"`
+</ResponseField>
+
+<ResponseField name="output_modality" type="string[]">
+  Array of supported output modalities: `"text"`, `"image"`, `"audio"`, `"video"`
+</ResponseField>
+
+<ResponseField name="credentials" type="string[]">
+  Array of credential names required to use this model.
+</ResponseField>
+
+<ResponseField name="properties" type="object">
+  Additional model-specific properties and capabilities.
+</ResponseField>
+
+## Model Types
+
+Different model types serve different purposes:
+
+### Large Language Models (LLM)
+
+```typescript
+plugin.addModel({
+  name: "claude-3-5-sonnet",
+  display_name: { en_US: "Claude 3.5 Sonnet" },
+  description: { 
+    en_US: "Anthropic's most intelligent model for complex tasks" 
+  },
+  model_type: "llm",
+  input_modality: ["text", "image"],
+  output_modality: ["text"],
+  credentials: ["anthropic_api_key"],
+  properties: {
+    max_tokens: 200000,
+    supports_streaming: true,
+    supports_function_calling: true,
+    supports_vision: true,
+    context_window: 200000
+  }
+})
+```
+
+### Embedding Models
+
+```typescript
+plugin.addModel({
+  name: "text-embedding-3-large",
+  display_name: { en_US: "Text Embedding 3 Large" },
+  description: { 
+    en_US: "OpenAI's most capable embedding model" 
+  },
+  model_type: "embedding",
+  input_modality: ["text"],
+  output_modality: ["text"],
+  credentials: ["openai_api_key"],
+  properties: {
+    dimensions: 3072,
+    max_input_tokens: 8191,
+    supports_batch: true
+  }
+})
+```
+
+### Vision Models
+
+```typescript
+plugin.addModel({
+  name: "gpt-4-vision",
+  display_name: { en_US: "GPT-4 Vision" },
+  description: { 
+    en_US: "Analyze and understand images with GPT-4" 
+  },
+  model_type: "vision",
+  input_modality: ["text", "image"],
+  output_modality: ["text"],
+  credentials: ["openai_api_key"],
+  properties: {
+    max_tokens: 128000,
+    max_images: 10,
+    supported_formats: ["png", "jpg", "webp", "gif"]
+  }
+})
+```
+
+### Audio Models
+
+```typescript
+plugin.addModel({
+  name: "whisper-1",
+  display_name: { en_US: "Whisper" },
+  description: { 
+    en_US: "OpenAI's speech recognition model" 
+  },
+  model_type: "audio",
+  input_modality: ["audio"],
+  output_modality: ["text"],
+  credentials: ["openai_api_key"],
+  properties: {
+    supported_formats: ["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm"],
+    max_file_size_mb: 25,
+    supports_translation: true,
+    supports_timestamps: true
+  }
+})
+```
+
+### Multimodal Models
+
+```typescript
+plugin.addModel({
+  name: "gemini-pro-vision",
+  display_name: { en_US: "Gemini Pro Vision" },
+  description: { 
+    en_US: "Google's multimodal model for text and vision tasks" 
+  },
+  model_type: "multimodal",
+  input_modality: ["text", "image", "audio", "video"],
+  output_modality: ["text"],
+  credentials: ["google_api_key"],
+  properties: {
+    max_tokens: 32000,
+    supports_streaming: true,
+    max_images: 16,
+    max_video_length_seconds: 60
+  }
+})
+```
+
+## Model Properties
+
+The `properties` field is flexible and can contain any model-specific information:
+
+### Common Properties
+
+```typescript
+properties: {
+  // Token limits
+  max_tokens: 128000,
+  context_window: 128000,
+  max_input_tokens: 100000,
+  max_output_tokens: 4096,
+  
+  // Capabilities
+  supports_streaming: true,
+  supports_function_calling: true,
+  supports_vision: false,
+  supports_json_mode: true,
+  
+  // Performance
+  average_latency_ms: 1500,
+  cost_per_1k_input_tokens: 0.01,
+  cost_per_1k_output_tokens: 0.03,
+  
+  // Format support
+  supported_formats: ["png", "jpg", "webp"],
+  supported_languages: ["en", "es", "fr", "de", "zh"],
+  
+  // Provider-specific
+  provider: "OpenAI",
+  api_version: "2024-02",
+  region: "us-east-1"
+}
+```
+
+### Custom Properties
+
+Add any properties relevant to your model:
+
+```typescript
+properties: {
+  // Model-specific features
+  supports_safety_settings: true,
+  default_temperature: 0.7,
+  recommended_use_cases: ["chat", "analysis", "generation"],
+  
+  // Rate limits
+  rate_limit_requests_per_minute: 60,
+  rate_limit_tokens_per_minute: 90000,
+  
+  // Fine-tuning
+  supports_fine_tuning: true,
+  fine_tuning_training_data_limit: 1000000,
+  
+  // Special capabilities
+  knowledge_cutoff: "2024-04",
+  supports_web_search: false,
+  supports_code_execution: true
+}
+```
+
+## Model Credentials
+
+Models typically require credentials to access the underlying API:
+
+```typescript
+// First, define the credential
+plugin.addCredential({
+  name: "openai_api_key",
+  display_name: { en_US: "OpenAI API Key" },
+  schema: {
+    type: "object",
+    properties: {
+      api_key: { type: "string", format: "password" },
+      organization_id: { type: "string" }
+    },
+    required: ["api_key"]
+  }
+})
+
+// Then, reference it in your model
+plugin.addModel({
+  name: "gpt-4",
+  display_name: { en_US: "GPT-4" },
+  model_type: "llm",
+  credentials: ["openai_api_key"],
+  // ...
+})
+```
+
+## Schema Validation
+
+Model definitions are validated using the `ModelDefinitionSchema` from `@choiceopen/atomemo-plugin-schema`:
+
+```typescript
+import { ModelDefinitionSchema } from "@choiceopen/atomemo-plugin-schema/schemas"
+
+const definition = ModelDefinitionSchema.parse(model)
+registry.register("model", definition)
+```
+
+If validation fails, a Zod error will be thrown with details about what's invalid.
+
+## Model Registration
+
+When you call `addModel`, the SDK:
+
+1. Validates the model definition against the schema
+2. Stores it in the registry using the model name as the key
+3. Makes it available for serialization and export
+
+```typescript
+// From registry.ts
+function register(type: "model", feature: ModelDefinition): void {
+  store[type].set(feature.name, feature)
+}
+```
+
+## Serialization
+
+Models are serialized when exporting your plugin definition:
+
+```typescript
+const serialized = registry.serialize()
+// serialized.plugin.models contains all registered models
+
+// In debug mode, this is written to definition.json
+{
+  "models": [
+    {
+      "name": "gpt-4-turbo",
+      "display_name": { "en_US": "GPT-4 Turbo" },
+      "model_type": "llm",
+      // ... other properties (functions are omitted)
+    }
+  ]
+}
+```
+
+## Example: Complete Model Setup
+
+```typescript
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({
+  name: "ai-models-plugin",
+  display_name: { en_US: "AI Models" },
+  description: { en_US: "Access to various AI models" }
+})
+
+// Define credential
+plugin.addCredential({
+  name: "openai_api_key",
+  display_name: { en_US: "OpenAI API Key" },
+  schema: {
+    type: "object",
+    properties: {
+      api_key: { type: "string" }
+    },
+    required: ["api_key"]
+  }
+})
+
+// Define multiple models
+plugin.addModel({
+  name: "gpt-4-turbo",
+  display_name: { en_US: "GPT-4 Turbo" },
+  description: { en_US: "Most capable GPT-4 model" },
+  model_type: "llm",
+  input_modality: ["text"],
+  output_modality: ["text"],
+  credentials: ["openai_api_key"],
+  properties: {
+    max_tokens: 128000,
+    supports_streaming: true,
+    supports_function_calling: true
+  }
+})
+
+plugin.addModel({
+  name: "gpt-3.5-turbo",
+  display_name: { en_US: "GPT-3.5 Turbo" },
+  description: { en_US: "Fast and efficient model" },
+  model_type: "llm",
+  input_modality: ["text"],
+  output_modality: ["text"],
+  credentials: ["openai_api_key"],
+  properties: {
+    max_tokens: 16385,
+    supports_streaming: true,
+    supports_function_calling: true
+  }
+})
+
+plugin.addModel({
+  name: "text-embedding-3-large",
+  display_name: { en_US: "Text Embedding 3 Large" },
+  description: { en_US: "High-quality text embeddings" },
+  model_type: "embedding",
+  input_modality: ["text"],
+  output_modality: ["text"],
+  credentials: ["openai_api_key"],
+  properties: {
+    dimensions: 3072,
+    max_input_tokens: 8191
+  }
+})
+
+await plugin.run()
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use descriptive model names" icon="tag">
+    Model names should clearly identify the model and version (e.g., `gpt-4-turbo`, `claude-3-5-sonnet`).
+  </Accordion>
+  
+  <Accordion title="Document capabilities thoroughly" icon="book">
+    Use the description and properties fields to clearly explain what the model can do and its limitations.
+  </Accordion>
+  
+  <Accordion title="Specify modalities accurately" icon="sliders">
+    Correctly specify input and output modalities to help users understand how to use the model.
+  </Accordion>
+  
+  <Accordion title="Include cost information" icon="dollar-sign">
+    If applicable, include cost per token in properties to help users estimate usage costs.
+  </Accordion>
+  
+  <Accordion title="Keep properties up to date" icon="sync">
+    When model capabilities change, update the model definition to reflect the current state.
+  </Accordion>
+  
+  <Accordion title="Group related models" icon="layer-group">
+    If you have multiple versions or variants of a model, consider using consistent naming conventions.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  Model definitions are primarily metadata. The actual model invocation happens through tools or external APIs. Models describe what's available, while tools provide the execution logic.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tools" icon="wrench" href="/concepts/tools">
+    Create tools that use your models
+  </Card>
+  
+  <Card title="Credentials" icon="key" href="/concepts/credentials">
+    Define credentials for accessing model APIs
+  </Card>
+  
+  <Card title="Registry" icon="book" href="/concepts/registry">
+    Understand how models are registered and resolved
+  </Card>
+</CardGroup>

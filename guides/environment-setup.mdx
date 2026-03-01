@@ -1,0 +1,442 @@
+---
+title: "Environment Setup"
+description: "Configure environment variables for your plugin"
+---
+
+The Atomemo Plugin SDK uses environment variables to configure runtime behavior, WebSocket connections, and authentication.
+
+## Required Environment Variables
+
+Your plugin requires these environment variables to run:
+
+### HUB_WS_URL
+
+The WebSocket URL of the Hub Server.
+
+```bash
+HUB_WS_URL=wss://hub.atomemo.ai
+```
+
+**Format:**
+- Must be a valid WebSocket URL
+- Supported protocols: `ws://` or `wss://`
+- The SDK appends `/{mode}_socket` automatically
+
+**Examples:**
+```bash
+# Production
+HUB_WS_URL=wss://hub.atomemo.ai
+
+# Staging
+HUB_WS_URL=wss://hub-staging.atomemo.ai
+
+# Local development
+HUB_WS_URL=ws://localhost:4000
+```
+
+<Note>
+  The SDK automatically determines the deployment environment (production/staging) based on the URL.
+</Note>
+
+### HUB_DEBUG_API_KEY
+
+API key for debug mode authentication.
+
+```bash
+HUB_DEBUG_API_KEY=your_api_key_here
+```
+
+**Requirements:**
+- Required when `NODE_ENV` is not `"production"`
+- Must be a non-empty string
+- Obtain from the Atomemo CLI: `atomemo plugin refresh-key`
+
+**Security:**
+- Never commit API keys to version control
+- Use `.env` files (add to `.gitignore`)
+- Rotate keys regularly
+
+## Optional Environment Variables
+
+### HUB_MODE
+
+Sets the plugin runtime mode.
+
+```bash
+HUB_MODE=debug
+```
+
+**Options:**
+- `debug` (default) - Development mode with dynamic registration
+- `release` - Production mode with static registration
+
+**Behavior differences:**
+
+| Feature | Debug Mode | Release Mode |
+|---------|-----------|-------------|
+| Registration | Dynamic via WebSocket | Static from `definition.json` |
+| Author info | From OneAuth API | From `definition.json` |
+| API key | Required | Not required |
+| Hot reload | Supported | Not supported |
+| Channel | `debug_plugin:{name}` | `release_plugin:{name}__{mode}__{version}` |
+| Definition file | Generated | Required |
+
+### DEBUG
+
+Enables debug logging.
+
+```bash
+DEBUG=true
+```
+
+**Behavior:**
+- `true` - Enable verbose logging
+- `false` - Minimal logging
+- Default: `true` when `NODE_ENV !== "production"`
+
+**Log output includes:**
+- WebSocket connection events
+- Channel join/leave messages
+- Incoming/outgoing messages
+- Error details
+
+### NODE_ENV
+
+Sets the Node.js environment.
+
+```bash
+NODE_ENV=development
+```
+
+**Options:**
+- `development` (default)
+- `production`
+- `test`
+
+**Effects:**
+- Controls default `DEBUG` value
+- Affects `HUB_DEBUG_API_KEY` validation
+- Influences SDK behavior (e.g., error verbosity)
+
+## Configuration File
+
+The SDK reads additional configuration from `~/.choiceform/atomemo.json`:
+
+```json
+{
+  "auth": {
+    "production": {
+      "endpoint": "https://oneauth.atomemo.ai",
+      "access_token": "your_access_token"
+    },
+    "staging": {
+      "endpoint": "https://oneauth-staging.atomemo.ai",
+      "access_token": "your_staging_token"
+    }
+  },
+  "hub": {
+    "production": {
+      "endpoint": "wss://hub.atomemo.ai"
+    },
+    "staging": {
+      "endpoint": "wss://hub-staging.atomemo.ai"
+    }
+  }
+}
+```
+
+**Purpose:**
+- Stores authentication tokens for OneAuth API
+- Provides deployment-specific endpoints
+- Managed by the Atomemo CLI
+
+<Warning>
+  Don't edit this file manually. Use the Atomemo CLI to manage configuration.
+</Warning>
+
+## Environment File Setup
+
+<Steps>
+  <Step title="Create .env file">
+    Create a `.env` file in your project root:
+
+    ```bash
+    touch .env
+    ```
+  </Step>
+
+  <Step title="Add environment variables">
+    Edit `.env` with your configuration:
+
+    ```bash
+    # Hub Server connection
+    HUB_WS_URL=wss://hub.atomemo.ai
+    HUB_DEBUG_API_KEY=your_api_key_here
+
+    # Runtime mode
+    HUB_MODE=debug
+
+    # Development settings
+    DEBUG=true
+    NODE_ENV=development
+    ```
+  </Step>
+
+  <Step title="Add to .gitignore">
+    Ensure `.env` is ignored by git:
+
+    ```bash
+    echo ".env" >> .gitignore
+    ```
+  </Step>
+
+  <Step title="Load environment variables">
+    The SDK automatically loads `.env` via `dotenv/config`:
+
+    ```typescript
+    import "dotenv/config"
+    import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+    // Environment variables are now available
+    const plugin = await createPlugin({ /* ... */ })
+    ```
+  </Step>
+</Steps>
+
+## Environment Validation
+
+The SDK validates environment variables on startup using Zod:
+
+```typescript
+// From src/env.ts
+const EnvSchema = z.object({
+  HUB_MODE: z.enum(["debug", "release"]).default("debug"),
+  HUB_WS_URL: z.url({ protocol: /wss?/ }),
+  HUB_DEBUG_API_KEY: z.string().optional().refine(/* ... */),
+  DEBUG: z.string().optional().transform(/* ... */),
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+})
+```
+
+**Validation errors:**
+
+If validation fails, you'll see detailed error messages:
+
+```
+Error: Invalid environment configuration
+- HUB_WS_URL: Expected string, received undefined
+- HUB_DEBUG_API_KEY: Required in non-production environments
+```
+
+The plugin will exit immediately with code 1.
+
+## Environment Variables by Use Case
+
+### Local Development
+
+```bash
+# .env
+HUB_MODE=debug
+HUB_WS_URL=ws://localhost:4000
+HUB_DEBUG_API_KEY=dev_key_abc123
+DEBUG=true
+NODE_ENV=development
+```
+
+### Staging Environment
+
+```bash
+# .env
+HUB_MODE=debug
+HUB_WS_URL=wss://hub-staging.atomemo.ai
+HUB_DEBUG_API_KEY=staging_key_xyz789
+DEBUG=true
+NODE_ENV=development
+```
+
+### Production Environment
+
+```bash
+# .env
+HUB_MODE=release
+HUB_WS_URL=wss://hub.atomemo.ai
+DEBUG=false
+NODE_ENV=production
+```
+
+<Note>
+  In production, `HUB_DEBUG_API_KEY` is not required.
+</Note>
+
+### Testing Environment
+
+```bash
+# .env.test
+HUB_MODE=debug
+HUB_WS_URL=ws://localhost:4000
+HUB_DEBUG_API_KEY=test_key_mock
+DEBUG=false
+NODE_ENV=test
+```
+
+## Reading Environment Variables
+
+The SDK provides a `getEnv()` function:
+
+```typescript
+import { getEnv } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const env = getEnv()
+
+console.log(env.HUB_MODE)          // "debug" or "release"
+console.log(env.HUB_WS_URL)        // "wss://hub.atomemo.ai"
+console.log(env.HUB_DEBUG_API_KEY) // "your_api_key" or undefined
+console.log(env.DEBUG)             // true or false
+console.log(env.NODE_ENV)          // "development", "production", or "test"
+```
+
+**TypeScript types:**
+
+```typescript
+interface Env {
+  HUB_MODE: "debug" | "release"
+  HUB_WS_URL: string
+  HUB_DEBUG_API_KEY?: string
+  DEBUG: boolean
+  NODE_ENV: "development" | "production" | "test"
+}
+```
+
+## Troubleshooting
+
+### Connection Errors
+
+**Error:** `Can't connect to the Plugin Hub server`
+
+**Causes:**
+- Invalid `HUB_WS_URL`
+- Expired `HUB_DEBUG_API_KEY`
+- Network connectivity issues
+
+**Solutions:**
+```bash
+# Verify WebSocket URL
+echo $HUB_WS_URL
+
+# Refresh API key
+atomemo plugin refresh-key
+
+# Test connectivity
+curl -I https://hub.atomemo.ai
+```
+
+### Validation Errors
+
+**Error:** `HUB_WS_URL must be a valid WebSocket URL`
+
+**Solution:**
+```bash
+# Wrong
+HUB_WS_URL=https://hub.atomemo.ai
+
+# Correct
+HUB_WS_URL=wss://hub.atomemo.ai
+```
+
+### Missing API Key
+
+**Error:** `HUB_DEBUG_API_KEY must be a string`
+
+**Solution:**
+```bash
+# Generate new key
+atomemo plugin refresh-key
+
+# Copy to .env
+HUB_DEBUG_API_KEY=your_new_key
+```
+
+### Environment Not Loaded
+
+**Error:** Environment variables undefined in code
+
+**Solution:**
+Ensure `dotenv/config` is imported:
+
+```typescript
+// Must be first import
+import "dotenv/config"
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use .env files for local development">
+    ```bash
+    # .env
+    HUB_WS_URL=wss://hub.atomemo.ai
+    HUB_DEBUG_API_KEY=dev_key_local
+    ```
+    Add `.env` to `.gitignore` to prevent committing secrets.
+  </Accordion>
+
+  <Accordion title="Use environment-specific files">
+    ```bash
+    .env              # Default
+    .env.development  # Development
+    .env.staging      # Staging
+    .env.production   # Production
+    .env.test         # Testing
+    ```
+    Load with: `dotenv -e .env.staging`
+  </Accordion>
+
+  <Accordion title="Validate environment on startup">
+    ```typescript
+    import { getEnv } from "@choiceopen/atomemo-plugin-sdk-js"
+
+    try {
+      const env = getEnv()
+      console.log("Environment loaded successfully")
+    } catch (error) {
+      console.error("Environment validation failed:", error)
+      process.exit(1)
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Document required variables">
+    Create a `.env.example` file:
+    ```bash
+    # .env.example
+    HUB_WS_URL=wss://hub.atomemo.ai
+    HUB_DEBUG_API_KEY=your_api_key_here
+    HUB_MODE=debug
+    DEBUG=true
+    NODE_ENV=development
+    ```
+    Commit this file to help other developers.
+  </Accordion>
+
+  <Accordion title="Rotate API keys regularly">
+    ```bash
+    # Refresh debug API key
+    atomemo plugin refresh-key
+    
+    # Update .env
+    # HUB_DEBUG_API_KEY=new_key_here
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Debug Mode" icon="bug" href="/guides/debug-mode">
+    Learn about debug mode features
+  </Card>
+  <Card title="Creating a Plugin" icon="plug" href="/guides/creating-a-plugin">
+    Start building your plugin
+  </Card>
+</CardGroup>

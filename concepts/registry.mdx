@@ -1,0 +1,409 @@
+---
+title: "Registry"
+description: "Type-safe feature registration and resolution system"
+---
+
+## Overview
+
+The Registry is the central storage and management system for all plugin features. It provides type-safe methods to register, resolve, and serialize credentials, tools, and models. Every plugin instance has an internal registry that tracks all registered features.
+
+## Registry Architecture
+
+The registry is created automatically when you create a plugin:
+
+```typescript
+const plugin = await createPlugin({ /* ... */ })
+// Internally creates: const registry = createRegistry(pluginDefinition)
+```
+
+### Internal Structure
+
+```typescript
+interface RegistryStore {
+  plugin: PluginRegistry
+  credential: Map<string, CredentialDefinition>
+  model: Map<string, ModelDefinition>
+  tool: Map<string, ToolDefinition>
+}
+```
+
+Each feature type is stored in a separate `Map` with the feature name as the key.
+
+## Registry Interface
+
+The registry provides three core operations:
+
+### 1. Register Features
+
+Store feature definitions in the registry:
+
+```typescript
+registry.register("credential", credentialDefinition)
+registry.register("tool", toolDefinition)
+registry.register("model", modelDefinition)
+```
+
+### 2. Resolve Features
+
+Retrieve feature definitions by type and name:
+
+```typescript
+const credential = registry.resolve("credential", "github_api_key")
+const tool = registry.resolve("tool", "send_message")
+const model = registry.resolve("model", "gpt-4")
+```
+
+### 3. Serialize Registry
+
+Convert the entire registry to a JSON-serializable format:
+
+```typescript
+const serialized = registry.serialize()
+// Returns: { plugin: { ...metadata, credentials: [...], tools: [...], models: [...] } }
+```
+
+## Registration
+
+### How Registration Works
+
+When you call `addCredential`, `addTool`, or `addModel` on your plugin:
+
+1. The definition is validated against its schema
+2. The validated definition is passed to `registry.register()`
+3. The registry stores it in the appropriate Map
+
+```typescript
+// From plugin.ts
+addTool: (tool: ToolDefinition) => {
+  // 1. Validate
+  const definition = ToolDefinitionSchema.parse(tool)
+  
+  // 2. Register
+  registry.register("tool", definition)
+}
+```
+
+### Implementation
+
+```typescript
+// From registry.ts
+function register(type: FeatureType, feature: Feature): void {
+  store[type].set(feature.name, feature)
+}
+```
+
+The implementation is simple: features are stored in a Map with their name as the key.
+
+### Type Safety
+
+The `register` function is overloaded to ensure type safety:
+
+```typescript
+register: {
+  (type: "credential", feature: CredentialDefinition): void
+  (type: "model", feature: ModelDefinition): void
+  (type: "tool", feature: ToolDefinition): void
+}
+```
+
+This ensures you can't accidentally register a tool as a credential, for example.
+
+## Resolution
+
+### How Resolution Works
+
+When the SDK needs to execute a tool or authenticate a credential:
+
+1. The registry looks up the feature by type and name
+2. If found, returns the feature definition
+3. If not found, throws an error
+
+```typescript
+// From plugin.ts
+channel.on("invoke_tool", async (message) => {
+  const { tool_name } = message
+  
+  // Resolve the tool definition
+  const definition = registry.resolve("tool", tool_name)
+  
+  // Execute the tool
+  const result = await definition.invoke({ /* ... */ })
+})
+```
+
+### Implementation
+
+```typescript
+// From registry.ts
+function resolve(type: FeatureType, featureName: string): Feature {
+  const feature = store[type].get(featureName)
+  
+  // Assert that feature exists
+  assert(feature, `Feature "${featureName}" not registered`)
+  
+  return feature
+}
+```
+
+### Error Handling
+
+If you try to resolve a feature that doesn't exist:
+
+```typescript
+try {
+  const tool = registry.resolve("tool", "nonexistent_tool")
+} catch (error) {
+  // Error: Feature "nonexistent_tool" not registered
+}
+```
+
+### Type Safety
+
+Like `register`, the `resolve` function is overloaded:
+
+```typescript
+resolve: {
+  (type: "credential", featureName: string): CredentialDefinition
+  (type: "model", featureName: string): ModelDefinition
+  (type: "tool", featureName: string): ToolDefinition
+}
+```
+
+This ensures the return type matches the feature type you're resolving.
+
+## Serialization
+
+### Purpose
+
+Serialization converts the registry into a JSON-serializable format for:
+
+1. **Registration**: Sending plugin definition to Hub Server (debug mode)
+2. **Export**: Writing `definition.json` for release deployments
+3. **Inspection**: Debugging and validating plugin configuration
+
+### How Serialization Works
+
+```typescript
+const { plugin } = registry.serialize()
+
+// Structure:
+{
+  plugin: {
+    // Plugin metadata
+    name: "my-plugin",
+    display_name: { en_US: "My Plugin" },
+    author: "Jane Doe",
+    email: "jane@example.com",
+    version: "1.0.0",
+    
+    // Serialized features (without functions)
+    credentials: [
+      { name: "api_key", display_name: { en_US: "API Key" }, /* ... */ }
+    ],
+    tools: [
+      { name: "send_message", display_name: { en_US: "Send Message" }, /* ... */ }
+    ],
+    models: [
+      { name: "gpt-4", display_name: { en_US: "GPT-4" }, /* ... */ }
+    ]
+  }
+}
+```
+
+### Implementation
+
+```typescript
+// From registry.ts
+serialize: () => {
+  assert(store.plugin, "Plugin is not registered")
+  
+  return {
+    plugin: Object.assign(store.plugin, {
+      credentials: Array.from(store.credential.values()).map(serializeFeature),
+      models: Array.from(store.model.values()).map(serializeFeature),
+      tools: Array.from(store.tool.values()).map(serializeFeature),
+    }),
+  }
+}
+```
+
+### Feature Serialization
+
+The `serializeFeature` utility removes functions from feature definitions:
+
+```typescript
+// From utils/serialize-feature.ts
+export const serializeFeature = (feature: Record<string, unknown>) => {
+  return Object.keys(feature).reduce<Record<string, JsonValue>>((finale, key) => {
+    const value = feature[key]
+    
+    // Skip function properties
+    if (isFunction(value)) {
+      return finale
+    }
+    
+    return Object.assign(finale, { [key]: value as JsonValue })
+  }, {})
+}
+```
+
+This ensures that executable code (like `invoke` and `authenticate` functions) are excluded from the serialized output.
+
+### Why Remove Functions?
+
+1. **Security**: Functions can't be safely transmitted over the network
+2. **JSON Compatibility**: Functions aren't JSON-serializable
+3. **Separation**: The definition.json describes *what* the plugin does, not *how*
+
+## Registry Access
+
+While you typically interact with the registry through plugin methods, you can access it directly:
+
+```typescript
+// Plugin metadata
+const pluginInfo = registry.plugin
+
+// Check what's registered
+const hasCredential = store.credential.has("api_key")
+const toolCount = store.tool.size
+
+// Serialize for export
+const definition = registry.serialize()
+await Bun.write("definition.json", JSON.stringify(definition.plugin, null, 2))
+```
+
+<Note>
+  The registry's internal `store` is not directly exposed in the public API. Access features through the `resolve` and `serialize` methods.
+</Note>
+
+## Feature Types
+
+The registry supports three feature types:
+
+```typescript
+type FeatureType = "credential" | "model" | "tool"
+```
+
+<Note>
+  Data sources (`data_source`) are defined in the type system but currently commented out in the implementation. Future versions may add support for data sources.
+</Note>
+
+## Example: Complete Registry Flow
+
+```typescript
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({
+  name: "example-plugin",
+  display_name: { en_US: "Example Plugin" },
+  description: { en_US: "Demonstrates registry usage" }
+})
+
+// Register features (internally uses registry.register)
+plugin.addCredential({
+  name: "api_key",
+  display_name: { en_US: "API Key" },
+  schema: {
+    type: "object",
+    properties: {
+      key: { type: "string" }
+    }
+  }
+})
+
+plugin.addTool({
+  name: "fetch_data",
+  display_name: { en_US: "Fetch Data" },
+  parameters: { type: "object", properties: {} },
+  credentials: ["api_key"],
+  invoke: async ({ args }) => {
+    return { data: "example" }
+  }
+})
+
+plugin.addModel({
+  name: "gpt-4",
+  display_name: { en_US: "GPT-4" },
+  model_type: "llm",
+  credentials: ["api_key"]
+})
+
+// When plugin runs:
+await plugin.run()
+
+// Internally, the SDK:
+// 1. Connects to Hub Server
+// 2. Serializes the registry
+// 3. Sends plugin definition (debug mode)
+// 4. Listens for tool invocations:
+channel.on("invoke_tool", async (message) => {
+  // Resolves tool from registry
+  const tool = registry.resolve("tool", message.tool_name)
+  
+  // Executes tool
+  const result = await tool.invoke({ args: message })
+  
+  // Sends response
+  channel.push("invoke_tool_response", result)
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use unique feature names" icon="fingerprint">
+    Feature names must be unique within each type. Use descriptive names that clearly identify the feature.
+  </Accordion>
+  
+  <Accordion title="Register before running" icon="clock">
+    Always register all features before calling `plugin.run()`. Features registered after the plugin starts won't be available.
+  </Accordion>
+  
+  <Accordion title="Handle resolution errors" icon="shield-exclamation">
+    When resolving features, handle cases where the feature might not exist (though this shouldn't happen if you've registered everything correctly).
+  </Accordion>
+  
+  <Accordion title="Validate before registering" icon="check-circle">
+    The SDK validates features automatically, but you can catch validation errors during registration to provide better error messages.
+  </Accordion>
+</AccordionGroup>
+
+## Internal Implementation Details
+
+### Registry Creation
+
+```typescript
+// From registry.ts
+export function createRegistry(plugin: PluginRegistry): Registry {
+  const store: RegistryStore = {
+    plugin,
+    credential: new Map(),
+    model: new Map(),
+    tool: new Map(),
+  }
+  
+  // Return interface with register, resolve, serialize methods
+  return { plugin: store.plugin, register, resolve, serialize }
+}
+```
+
+### Plugin Definition Type
+
+```typescript
+// Excludes transporterOptions from serialization
+type PluginRegistry = Omit<PluginDefinition, "transporterOptions">
+```
+
+The transporter options are used for WebSocket configuration but aren't part of the plugin definition sent to the Hub Server.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Plugins" icon="puzzle-piece" href="/concepts/plugins">
+    Learn about the plugin lifecycle and architecture
+  </Card>
+  
+  <Card title="Transporter" icon="network-wired" href="/concepts/transporter">
+    Understand how features are transmitted to Hub Server
+  </Card>
+</CardGroup>

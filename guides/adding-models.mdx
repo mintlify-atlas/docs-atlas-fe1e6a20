@@ -1,0 +1,535 @@
+---
+title: "Adding Models"
+description: "Learn how to integrate AI models into your plugin"
+---
+
+Models represent AI capabilities that your plugin provides, such as language models, embedding models, or vision models.
+
+## What are Models?
+
+Models in Atomemo plugins are:
+
+- **AI model definitions** (LLMs, embeddings, vision, etc.)
+- **Provider and model information** for routing
+- **Capability specifications** (input/output modalities)
+- **Configuration for parameters** and constraints
+
+## Basic Model Definition
+
+<Steps>
+  <Step title="Define the model">
+    Create a model definition with required fields:
+
+    ```typescript
+    plugin.addModel({
+      name: "openai/gpt-4",
+      display_name: { en_US: "GPT-4" },
+      description: { 
+        en_US: "OpenAI's most capable language model" 
+      },
+      icon: "🤖",
+      model_type: "llm",
+      input_modalities: ["text"],
+      output_modalities: ["text"],
+      unsupported_parameters: [],
+    })
+    ```
+  </Step>
+
+  <Step title="Link credentials (optional)">
+    If your model requires authentication, link credentials:
+
+    ```typescript
+    plugin.addModel({
+      name: "openai/gpt-4",
+      // ... other fields
+      credentials: ["openai-api-key"],
+    })
+    ```
+  </Step>
+</Steps>
+
+## Model Structure
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Unique identifier (format: `provider/model-name`) |
+| `display_name` | `Record<Locale, string>` | Human-readable name |
+| `description` | `Record<Locale, string>` | Model capabilities and use cases |
+| `icon` | `string` | Visual identifier (emoji/icon) |
+| `model_type` | `ModelType` | Type of model (see below) |
+| `input_modalities` | `Modality[]` | Supported input types |
+| `output_modalities` | `Modality[]` | Supported output types |
+| `unsupported_parameters` | `string[]` | Parameters this model doesn't support |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `credentials` | `string[]` | Required credential names |
+| `max_tokens` | `number` | Maximum token limit |
+| `context_window` | `number` | Context window size |
+| `pricing` | `Pricing` | Cost information |
+| `capabilities` | `string[]` | Special capabilities (e.g., "function-calling") |
+
+## Model Types
+
+Atomemo supports various model types:
+
+### Language Model (LLM)
+
+```typescript
+plugin.addModel({
+  name: "anthropic/claude-3-opus",
+  display_name: { en_US: "Claude 3 Opus" },
+  description: { 
+    en_US: "Anthropic's most capable model for complex tasks" 
+  },
+  icon: "🧠",
+  model_type: "llm",
+  input_modalities: ["text", "image"],
+  output_modalities: ["text"],
+  unsupported_parameters: [],
+  max_tokens: 4096,
+  context_window: 200000,
+  capabilities: ["function-calling", "multi-modal"],
+})
+```
+
+### Embedding Model
+
+```typescript
+plugin.addModel({
+  name: "openai/text-embedding-3-large",
+  display_name: { en_US: "Text Embedding 3 Large" },
+  description: { 
+    en_US: "High-dimensional text embeddings" 
+  },
+  icon: "🔢",
+  model_type: "embedding",
+  input_modalities: ["text"],
+  output_modalities: ["embedding"],
+  unsupported_parameters: ["temperature", "top_p"],
+  max_tokens: 8191,
+})
+```
+
+### Vision Model
+
+```typescript
+plugin.addModel({
+  name: "google/gemini-pro-vision",
+  display_name: { en_US: "Gemini Pro Vision" },
+  description: { 
+    en_US: "Multi-modal model for vision and language tasks" 
+  },
+  icon: "👁️",
+  model_type: "vision",
+  input_modalities: ["text", "image", "video"],
+  output_modalities: ["text"],
+  unsupported_parameters: [],
+})
+```
+
+### Speech-to-Text Model
+
+```typescript
+plugin.addModel({
+  name: "openai/whisper-1",
+  display_name: { en_US: "Whisper" },
+  description: { 
+    en_US: "Automatic speech recognition model" 
+  },
+  icon: "🎤",
+  model_type: "speech-to-text",
+  input_modalities: ["audio"],
+  output_modalities: ["text"],
+  unsupported_parameters: ["temperature", "max_tokens"],
+})
+```
+
+### Text-to-Speech Model
+
+```typescript
+plugin.addModel({
+  name: "elevenlabs/multilingual-v2",
+  display_name: { en_US: "Multilingual v2" },
+  description: { 
+    en_US: "Natural-sounding text-to-speech" 
+  },
+  icon: "🔊",
+  model_type: "text-to-speech",
+  input_modalities: ["text"],
+  output_modalities: ["audio"],
+  unsupported_parameters: [],
+})
+```
+
+## Input/Output Modalities
+
+Specify what types of data the model accepts and produces:
+
+### Supported Modalities
+
+- `"text"` - Text input/output
+- `"image"` - Image input/output
+- `"audio"` - Audio input/output
+- `"video"` - Video input/output
+- `"embedding"` - Vector embeddings
+
+### Multi-Modal Examples
+
+```typescript
+// Text + Image → Text (Vision model)
+input_modalities: ["text", "image"]
+output_modalities: ["text"]
+
+// Text → Image (Image generation)
+input_modalities: ["text"]
+output_modalities: ["image"]
+
+// Audio + Text → Text (Speech + context)
+input_modalities: ["audio", "text"]
+output_modalities: ["text"]
+```
+
+## Unsupported Parameters
+
+Specify parameters that don't apply to your model:
+
+```typescript
+plugin.addModel({
+  name: "my-provider/deterministic-model",
+  // ...
+  unsupported_parameters: [
+    "temperature",    // Model doesn't support temperature
+    "top_p",          // No nucleus sampling
+    "frequency_penalty",
+    "presence_penalty",
+  ],
+})
+```
+
+Common parameters that might be unsupported:
+- `temperature` - Randomness control
+- `top_p` - Nucleus sampling
+- `top_k` - Top-k sampling
+- `frequency_penalty` - Repetition reduction
+- `presence_penalty` - Topic diversity
+- `max_tokens` - Output length limit
+- `stop` - Stop sequences
+
+## Model Naming Convention
+
+Follow the `provider/model-name` format:
+
+```typescript
+// Good examples
+"openai/gpt-4"
+"anthropic/claude-3-opus"
+"google/gemini-pro"
+"mistralai/mistral-large"
+"meta/llama-3-70b"
+
+// Include version when relevant
+"openai/gpt-4-turbo-2024-04-09"
+"anthropic/claude-3-opus-20240229"
+```
+
+## Real-World Examples
+
+### Example 1: GPT-4 with Function Calling
+
+```typescript
+plugin.addModel({
+  name: "openai/gpt-4-turbo",
+  display_name: { en_US: "GPT-4 Turbo" },
+  description: { 
+    en_US: "Most capable GPT-4 model with improved performance and lower cost" 
+  },
+  icon: "⚡",
+  model_type: "llm",
+  input_modalities: ["text", "image"],
+  output_modalities: ["text"],
+  credentials: ["openai-api-key"],
+  unsupported_parameters: [],
+  max_tokens: 4096,
+  context_window: 128000,
+  capabilities: [
+    "function-calling",
+    "json-mode",
+    "multi-modal",
+    "system-messages",
+  ],
+  pricing: {
+    input: 0.00001,  // $0.01 per 1K tokens
+    output: 0.00003, // $0.03 per 1K tokens
+    currency: "USD",
+  },
+})
+```
+
+### Example 2: Local LLM
+
+```typescript
+plugin.addModel({
+  name: "ollama/llama3:70b",
+  display_name: { en_US: "Llama 3 70B (Local)" },
+  description: { 
+    en_US: "Meta's Llama 3 model running locally via Ollama" 
+  },
+  icon: "🦙",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: [
+    "frequency_penalty",
+    "presence_penalty",
+  ],
+  max_tokens: 8192,
+  context_window: 8192,
+  capabilities: ["local", "self-hosted"],
+  pricing: {
+    input: 0,
+    output: 0,
+    currency: "USD",
+  },
+})
+```
+
+### Example 3: Specialized Embedding Model
+
+```typescript
+plugin.addModel({
+  name: "cohere/embed-english-v3",
+  display_name: { en_US: "Cohere Embed English v3" },
+  description: { 
+    en_US: "High-quality English text embeddings optimized for semantic search" 
+  },
+  icon: "🔍",
+  model_type: "embedding",
+  input_modalities: ["text"],
+  output_modalities: ["embedding"],
+  credentials: ["cohere-api-key"],
+  unsupported_parameters: [
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "stop",
+  ],
+  max_tokens: 512,
+  capabilities: [
+    "semantic-search",
+    "classification",
+    "clustering",
+  ],
+  pricing: {
+    input: 0.0001,  // $0.10 per 1M tokens
+    output: 0,
+    currency: "USD",
+  },
+})
+```
+
+### Example 4: Image Generation Model
+
+```typescript
+plugin.addModel({
+  name: "stability/stable-diffusion-xl",
+  display_name: { en_US: "Stable Diffusion XL" },
+  description: { 
+    en_US: "High-resolution image generation from text prompts" 
+  },
+  icon: "🎨",
+  model_type: "text-to-image",
+  input_modalities: ["text"],
+  output_modalities: ["image"],
+  credentials: ["stability-api-key"],
+  unsupported_parameters: [
+    "temperature",
+    "top_p",
+    "max_tokens",
+  ],
+  capabilities: [
+    "high-resolution",
+    "style-presets",
+    "negative-prompts",
+  ],
+  pricing: {
+    input: 0,
+    output: 0.002,  // Per image
+    currency: "USD",
+  },
+})
+```
+
+### Example 5: Multi-Modal Model
+
+```typescript
+plugin.addModel({
+  name: "anthropic/claude-3.5-sonnet",
+  display_name: { en_US: "Claude 3.5 Sonnet" },
+  description: { 
+    en_US: "Advanced model with vision capabilities and extended context" 
+  },
+  icon: "🎭",
+  model_type: "llm",
+  input_modalities: ["text", "image"],
+  output_modalities: ["text"],
+  credentials: ["anthropic-api-key"],
+  unsupported_parameters: [],
+  max_tokens: 4096,
+  context_window: 200000,
+  capabilities: [
+    "function-calling",
+    "multi-modal",
+    "extended-context",
+    "code-generation",
+  ],
+  pricing: {
+    input: 0.000003,   // $3 per 1M tokens
+    output: 0.000015,  // $15 per 1M tokens
+    currency: "USD",
+  },
+})
+```
+
+## Model Invocation
+
+While model definitions don't have an `invoke` function like tools, they're used by tools that call model APIs:
+
+```typescript
+// Add a model definition
+plugin.addModel({
+  name: "openai/gpt-4",
+  // ... model config
+})
+
+// Create a tool that uses the model
+plugin.addTool({
+  name: "generate-text",
+  display_name: { en_US: "Generate Text" },
+  credentials: ["openai-api-key"],
+  parameters: [
+    {
+      name: "prompt",
+      type: "string",
+      required: true,
+    },
+  ],
+  invoke: async ({ args }) => {
+    const { parameters, credentials } = args
+    const apiKey = credentials?.["openai-api-key"]?.api_key
+    
+    // Call OpenAI API
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4",
+        messages: [{ role: "user", content: parameters.prompt }],
+      }),
+    })
+    
+    const data = await response.json()
+    return data.choices[0].message.content
+  },
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use accurate capability descriptions">
+    ```typescript
+    description: {
+      en_US: "Specialized for code generation and technical tasks"
+    },
+    capabilities: [
+      "code-generation",
+      "code-review",
+      "debugging",
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="Specify token limits accurately">
+    ```typescript
+    max_tokens: 4096,        // Output limit
+    context_window: 128000,  // Total context
+    ```
+  </Accordion>
+
+  <Accordion title="List all unsupported parameters">
+    ```typescript
+    // For deterministic models
+    unsupported_parameters: [
+      "temperature",
+      "top_p",
+      "top_k",
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="Include pricing when available">
+    ```typescript
+    pricing: {
+      input: 0.00001,   // Cost per token
+      output: 0.00003,
+      currency: "USD",
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use semantic versioning in model names">
+    ```typescript
+    // Good: Clear versioning
+    "openai/gpt-4-turbo-2024-04-09"
+    
+    // OK: Version suffix
+    "anthropic/claude-3-opus"
+    
+    // Avoid: No version info
+    "provider/model"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Model Registration
+
+Models are registered similarly to other features:
+
+```typescript
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({ /* ... */ })
+
+// Register multiple models
+plugin.addModel({ name: "openai/gpt-4", /* ... */ })
+plugin.addModel({ name: "openai/gpt-3.5-turbo", /* ... */ })
+plugin.addModel({ name: "openai/text-embedding-3-large", /* ... */ })
+
+await plugin.run()
+```
+
+The SDK automatically:
+1. Validates model definitions with Zod
+2. Registers them in the internal registry
+3. Serializes them for transmission to Hub Server
+4. Excludes function properties from serialization
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Debug Mode" icon="bug" href="/guides/debug-mode">
+    Test your model definitions
+  </Card>
+  <Card title="Model API Reference" icon="book" href="/api/types/model-definition">
+    Complete model definition reference
+  </Card>
+</CardGroup>

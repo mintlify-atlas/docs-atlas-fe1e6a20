@@ -1,0 +1,255 @@
+---
+title: TransporterOptions
+description: Configuration options for the network transporter that connects plugins to the Hub Server
+---
+
+## Overview
+
+The `TransporterOptions` type configures the WebSocket-based transporter that maintains the connection between your plugin and the Atomemo Hub Server. It provides lifecycle hooks and connection settings.
+
+## Type Definition
+
+```typescript
+interface TransporterOptions extends Partial<Pick<SocketConnectOption, "heartbeatIntervalMs">> {
+  onOpen?: (event?: Event) => void
+  onClose?: (event?: CloseEvent) => void
+  onError?: (error: Error, transport: string, establishedConnections: number) => void
+  onMessage?: (message: any) => void
+}
+```
+
+## Properties
+
+<ParamField path="heartbeatIntervalMs" type="number">
+  The interval in milliseconds between heartbeat messages to keep the WebSocket connection alive.
+  
+  **Default:** `30000` (30 seconds)
+  
+  **Example:** `60000` for 60-second intervals
+</ParamField>
+
+<ParamField path="onOpen" type="function">
+  Callback invoked when the WebSocket connection is successfully established.
+  
+  **Parameters:**
+  - `event` - Optional Event object from the WebSocket open event
+  
+  **Example:**
+  ```typescript
+  onOpen: () => {
+    console.log("Connected to Hub Server")
+  }
+  ```
+</ParamField>
+
+<ParamField path="onClose" type="function">
+  Callback invoked when the WebSocket connection is closed.
+  
+  **Parameters:**
+  - `event` - Optional CloseEvent object with close details
+  
+  **Example:**
+  ```typescript
+  onClose: (event) => {
+    console.log(`Connection closed: ${event?.code} - ${event?.reason}`)
+  }
+  ```
+</ParamField>
+
+<ParamField path="onError" type="function">
+  Callback invoked when a WebSocket error occurs.
+  
+  **Parameters:**
+  - `error` - The error that occurred
+  - `transport` - The transport type (e.g., "websocket")
+  - `establishedConnections` - Number of established connections
+  
+  **Example:**
+  ```typescript
+  onError: (error, transport, connections) => {
+    console.error(`Transport error on ${transport}:`, error)
+    console.log(`Active connections: ${connections}`)
+  }
+  ```
+  
+  **Note:** The SDK has built-in error handling for common errors like authentication failures.
+</ParamField>
+
+<ParamField path="onMessage" type="function">
+  Callback invoked when any message is received through the WebSocket.
+  
+  **Parameters:**
+  - `message` - The message object received
+  
+  **Example:**
+  ```typescript
+  onMessage: (message) => {
+    console.log("Received message:", message)
+  }
+  ```
+</ParamField>
+
+## Usage
+
+Transporter options are passed as part of the plugin definition:
+
+```typescript
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js"
+
+const plugin = await createPlugin({
+  name: "my-plugin",
+  display_name: { en_US: "My Plugin" },
+  description: { en_US: "A plugin with custom transporter options" },
+  icon: "🔌",
+  locales: ["en_US"],
+  transporterOptions: {
+    heartbeatIntervalMs: 60000,
+    onOpen: () => {
+      console.log("Plugin connected to Hub")
+    },
+    onClose: (event) => {
+      console.log("Plugin disconnected", event)
+    },
+    onError: (error) => {
+      console.error("Connection error:", error)
+    }
+  }
+})
+```
+
+## Example: Minimal Configuration
+
+```typescript
+const plugin = await createPlugin({
+  name: "simple-plugin",
+  display_name: { en_US: "Simple Plugin" },
+  description: { en_US: "A simple plugin" },
+  icon: "🔌",
+  locales: ["en_US"]
+  // No transporterOptions - uses defaults
+})
+```
+
+## Example: With Connection Monitoring
+
+```typescript
+const plugin = await createPlugin({
+  name: "monitored-plugin",
+  display_name: { en_US: "Monitored Plugin" },
+  description: { en_US: "A plugin with connection monitoring" },
+  icon: "🔌",
+  locales: ["en_US"],
+  transporterOptions: {
+    heartbeatIntervalMs: 30000,
+    onOpen: () => {
+      console.log("[%s] Connected to Hub", new Date().toISOString())
+    },
+    onClose: (event) => {
+      console.log(
+        "[%s] Disconnected from Hub (code: %d, reason: %s)",
+        new Date().toISOString(),
+        event?.code,
+        event?.reason
+      )
+    },
+    onError: (error, transport, connections) => {
+      console.error(
+        "[%s] Transport error on %s (connections: %d):",
+        new Date().toISOString(),
+        transport,
+        connections,
+        error
+      )
+    },
+    onMessage: (message) => {
+      // Log all incoming messages for debugging
+      console.debug("[%s] Message:", new Date().toISOString(), message)
+    }
+  }
+})
+```
+
+## Example: Custom Heartbeat Interval
+
+```typescript
+const plugin = await createPlugin({
+  name: "long-running-plugin",
+  display_name: { en_US: "Long Running Plugin" },
+  description: { en_US: "A plugin with longer heartbeat interval" },
+  icon: "🔌",
+  locales: ["en_US"],
+  transporterOptions: {
+    // Send heartbeat every 2 minutes instead of default 30 seconds
+    heartbeatIntervalMs: 120000,
+    onOpen: () => {
+      console.log("Plugin started with 2-minute heartbeat interval")
+    }
+  }
+})
+```
+
+## Connection Lifecycle
+
+1. **Initialization:** The transporter creates a WebSocket connection to the Hub Server
+2. **Authentication:** In debug mode, the connection is authenticated with the debug API key
+3. **Open:** The `onOpen` callback is triggered when the connection is established
+4. **Heartbeat:** Regular heartbeat messages are sent based on `heartbeatIntervalMs`
+5. **Messages:** The `onMessage` callback is triggered for all incoming messages
+6. **Errors:** The `onError` callback is triggered if connection errors occur
+7. **Close:** The `onClose` callback is triggered when the connection is closed
+
+## Built-in Error Handling
+
+The SDK includes automatic error handling for common scenarios:
+
+### Authentication Failure
+
+If the debug API key is missing or invalid, the SDK:
+1. Detects the 401/403 error
+2. Logs a helpful error message
+3. Suggests running `atomemo plugin refresh-key`
+4. Exits the process
+
+### Connection Failure
+
+If the WebSocket connection fails, the SDK:
+1. Logs the error through the `onError` callback
+2. Provides context about the transport and connection count
+
+## Debug Mode
+
+In debug mode (`HUB_MODE=debug`), additional logging is enabled:
+
+```typescript
+transporterOptions: {
+  onOpen: () => {
+    console.log("Debug mode: Connected")
+  },
+  onMessage: (message) => {
+    // In debug mode, you might want verbose message logging
+    console.debug("Received:", JSON.stringify(message, null, 2))
+  }
+}
+```
+
+## Environment Variables
+
+The transporter uses these environment variables:
+
+- `HUB_WS_URL` - WebSocket URL of the Hub Server (required)
+- `HUB_MODE` - Either "debug" or "release" (default: "debug")
+- `HUB_DEBUG_API_KEY` - API key for debug mode authentication
+- `DEBUG` - Enable debug logging (auto-enabled in non-production)
+- `NODE_ENV` - Environment mode ("development", "production", "test")
+
+See [Environment](/api/utilities/environment) for details.
+
+## Related Types
+
+- [PluginDefinition](/api/types/plugin-definition) - Parent plugin configuration that accepts transporter options
+
+## See Also
+
+- [Transporter](/api/transporter) - The transporter API reference
+- [Environment Setup](/guides/environment-setup) - Configuring environment variables
+- [Debug Mode](/guides/debug-mode) - Using debug mode during development

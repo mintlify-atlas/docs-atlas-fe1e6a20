@@ -1,0 +1,210 @@
+---
+title: Logger
+description: Structured logging with Pino for Atomemo plugins
+---
+
+## Overview
+
+The logger module provides a pre-configured [Pino](https://getpino.io/) logger instance with environment-aware settings. It automatically adjusts log levels and formatting based on your environment.
+
+## Usage
+
+### Importing the Logger
+
+```typescript
+import { logger } from "@atomemo/plugin-sdk"
+```
+
+### Basic Logging
+
+```typescript
+import { logger } from "@atomemo/plugin-sdk"
+
+logger.info("Plugin started")
+logger.error("Connection failed", { url: "wss://hub.atomemo.com" })
+logger.debug("Processing message", { messageId: 123 })
+logger.trace("Detailed trace information")
+```
+
+## Log Levels
+
+The logger supports standard Pino log levels:
+
+- `trace`: Most detailed logging (only in debug mode)
+- `debug`: Detailed debugging information (only in debug mode)
+- `info`: General informational messages
+- `warn`: Warning messages
+- `error`: Error messages
+- `fatal`: Fatal errors that cause termination
+
+### Level Configuration
+
+The log level is automatically configured based on the `DEBUG` environment variable:
+
+- **Debug Mode** (`DEBUG=true`): Level set to `"trace"` - all logs are shown
+- **Production Mode** (`DEBUG=false`): Level set to `"error"` - only errors and fatal logs are shown
+
+```typescript
+export const logger = pino({
+  level: env.DEBUG ? "trace" : "error",
+  // ...
+})
+```
+
+## Configuration
+
+### Timestamp Format
+
+All logs include ISO 8601 timestamps:
+
+```typescript
+timestamp: pino.stdTimeFunctions.isoTime
+```
+
+**Example output:**
+```json
+{"level":30,"time":"2026-03-01T12:34:56.789Z","msg":"Plugin started"}
+```
+
+### Transport (Development/Test)
+
+In development and test environments (`NODE_ENV=development` or `NODE_ENV=test`), the logger uses `pino-pretty` for human-readable output:
+
+```typescript
+transport: ["development", "test"].includes(env.NODE_ENV)
+  ? {
+      targets: [
+        {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            ignore: "pid,hostname",
+            translateTime: "mm/dd/yyyy HH:MM:ss TT",
+          },
+        },
+      ],
+    }
+  : undefined
+```
+
+**Pretty output example:**
+```
+03/01/2026 12:34:56 PM INFO: Plugin started
+03/01/2026 12:34:57 PM ERROR: Connection failed
+    url: "wss://hub.atomemo.com"
+```
+
+### Production Format
+
+In production (`NODE_ENV=production`), logs are output as compact JSON for efficient parsing:
+
+```json
+{"level":30,"time":"2026-03-01T12:34:56.789Z","msg":"Plugin started"}
+{"level":50,"time":"2026-03-01T12:34:57.123Z","url":"wss://hub.atomemo.com","msg":"Connection failed"}
+```
+
+## Examples
+
+### Structured Logging
+
+```typescript
+import { logger } from "@atomemo/plugin-sdk"
+
+// Log with context object
+logger.info({ userId: "123", action: "login" }, "User logged in")
+
+// Log with error
+try {
+  await connectToHub()
+} catch (error) {
+  logger.error({ err: error }, "Failed to connect to hub")
+}
+```
+
+### Child Loggers
+
+Create child loggers with bound context:
+
+```typescript
+import { logger } from "@atomemo/plugin-sdk"
+
+const pluginLogger = logger.child({ plugin: "my-plugin", version: "1.0.0" })
+
+pluginLogger.info("Initialized") // Includes plugin and version in every log
+```
+
+### Conditional Logging
+
+```typescript
+import { logger } from "@atomemo/plugin-sdk"
+import { getEnv } from "@atomemo/plugin-sdk"
+
+const env = getEnv()
+
+if (env.DEBUG) {
+  logger.debug("Detailed debug information")
+}
+```
+
+## Environment Dependencies
+
+The logger depends on these environment variables (managed by [`getEnv()`](/api/utilities/environment)):
+
+- **`DEBUG`**: Controls log level (trace vs error)
+- **`NODE_ENV`**: Controls output format (pretty vs JSON)
+
+## Performance
+
+Pino is one of the fastest Node.js loggers:
+
+- Asynchronous by default
+- Low overhead in production
+- JSON output for efficient parsing
+- Pretty printing only in development
+
+## Best Practices
+
+### Use Appropriate Log Levels
+
+```typescript
+// Good
+logger.trace("Raw message data", { data })
+logger.debug("Processing step completed", { step: 1 })
+logger.info("Plugin started successfully")
+logger.warn("Deprecated API used")
+logger.error("Failed to process message", { err })
+
+// Avoid
+logger.info("x = 123") // Too verbose for info
+logger.error("Success") // Wrong level
+```
+
+### Include Context
+
+```typescript
+// Good - includes context
+logger.error({ err, userId, messageId }, "Failed to process message")
+
+// Less useful - missing context
+logger.error("Failed to process message")
+```
+
+### Don't Log Sensitive Data
+
+```typescript
+// Bad - logs API key
+logger.info({ apiKey: env.HUB_DEBUG_API_KEY }, "Connecting")
+
+// Good - redacts sensitive data
+logger.info({ apiKey: "***" }, "Connecting")
+```
+
+## Type Definition
+
+```typescript
+import type { Logger } from "pino"
+
+export const logger: Logger
+```
+
+For full Pino API documentation, see the [official Pino docs](https://getpino.io/).

@@ -1,0 +1,421 @@
+---
+title: "Custom Model"
+description: "Add custom AI models to your plugin"
+---
+
+This example demonstrates how to integrate custom AI models into your Atomemo plugin, making them available to users alongside standard models.
+
+## Overview
+
+You'll learn how to:
+- Define custom models with `addModel()`
+- Specify model capabilities and modalities
+- Configure unsupported parameters
+- Register multiple model variants
+
+## Complete Example
+
+```typescript index.ts
+import { createPlugin } from "@choiceopen/atomemo-plugin-sdk-js";
+
+const plugin = await createPlugin({
+  name: "custom-ai-models",
+  display_name: { en_US: "Custom AI Models" },
+  description: { en_US: "Plugin providing access to custom AI models" },
+  icon: "🤖",
+  locales: ["en_US"],
+});
+
+// Add a custom LLM model
+plugin.addModel({
+  name: "custom-ai/gpt-specialist-v1",
+  display_name: { en_US: "GPT Specialist v1" },
+  description: {
+    en_US: "A specialized language model optimized for technical documentation",
+  },
+  icon: "📝",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: ["temperature", "top_p"],
+});
+
+// Add a multimodal model
+plugin.addModel({
+  name: "custom-ai/vision-plus-v2",
+  display_name: { en_US: "Vision Plus v2" },
+  description: {
+    en_US: "Advanced vision model with text generation capabilities",
+  },
+  icon: "👁️",
+  model_type: "llm",
+  input_modalities: ["text", "image"],
+  output_modalities: ["text"],
+  unsupported_parameters: ["frequency_penalty", "presence_penalty"],
+});
+
+// Add an embedding model
+plugin.addModel({
+  name: "custom-ai/embeddings-v3",
+  display_name: { en_US: "Custom Embeddings v3" },
+  description: {
+    en_US: "High-performance embedding model for semantic search",
+  },
+  icon: "🔍",
+  model_type: "embedding",
+  input_modalities: ["text"],
+  output_modalities: ["embedding"],
+  unsupported_parameters: [],
+});
+
+// Add a text-to-speech model
+plugin.addModel({
+  name: "custom-ai/voice-natural-v1",
+  display_name: { en_US: "Natural Voice v1" },
+  description: {
+    en_US: "Natural-sounding text-to-speech synthesis",
+  },
+  icon: "🔊",
+  model_type: "tts",
+  input_modalities: ["text"],
+  output_modalities: ["audio"],
+  unsupported_parameters: ["max_tokens", "temperature"],
+});
+
+// Add a speech-to-text model
+plugin.addModel({
+  name: "custom-ai/transcribe-pro-v2",
+  display_name: { en_US: "Transcribe Pro v2" },
+  description: {
+    en_US: "Accurate speech-to-text transcription with timestamp support",
+  },
+  icon: "🎙️",
+  model_type: "stt",
+  input_modalities: ["audio"],
+  output_modalities: ["text"],
+  unsupported_parameters: ["temperature", "top_k"],
+});
+
+// Add an image generation model
+plugin.addModel({
+  name: "custom-ai/image-creator-v1",
+  display_name: { en_US: "Image Creator v1" },
+  description: {
+    en_US: "Create high-quality images from text descriptions",
+  },
+  icon: "🎨",
+  model_type: "image_generation",
+  input_modalities: ["text"],
+  output_modalities: ["image"],
+  unsupported_parameters: ["temperature", "top_p", "frequency_penalty"],
+});
+
+await plugin.run();
+```
+
+## Code Breakdown
+
+### Model Definition Structure
+
+Each model is defined with the following properties:
+
+```typescript
+plugin.addModel({
+  name: "provider/model-name",           // Unique identifier
+  display_name: { en_US: "Model Name" }, // Human-readable name
+  description: { en_US: "..." },         // Model description
+  icon: "🤖",                            // Model icon
+  model_type: "llm",                     // Model type
+  input_modalities: ["text"],            // Supported inputs
+  output_modalities: ["text"],           // Supported outputs
+  unsupported_parameters: [],            // Excluded parameters
+});
+```
+
+### Model Types
+
+Atomemo supports several model types:
+
+<CodeGroup>
+```typescript LLM
+{
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+}
+```
+
+```typescript Embedding
+{
+  model_type: "embedding",
+  input_modalities: ["text"],
+  output_modalities: ["embedding"],
+}
+```
+
+```typescript Text-to-Speech
+{
+  model_type: "tts",
+  input_modalities: ["text"],
+  output_modalities: ["audio"],
+}
+```
+
+```typescript Speech-to-Text
+{
+  model_type: "stt",
+  input_modalities: ["audio"],
+  output_modalities: ["text"],
+}
+```
+
+```typescript Image Generation
+{
+  model_type: "image_generation",
+  input_modalities: ["text"],
+  output_modalities: ["image"],
+}
+```
+</CodeGroup>
+
+### Input and Output Modalities
+
+Modalities define what types of data the model can process:
+
+| Modality | Description | Example Use |
+|----------|-------------|-------------|
+| `text` | Text data | Prompts, documents, transcripts |
+| `image` | Image data | Photos, diagrams, screenshots |
+| `audio` | Audio data | Speech, music, sounds |
+| `video` | Video data | Clips, recordings |
+| `embedding` | Vector embeddings | Semantic search results |
+
+<Info>
+Multimodal models can accept multiple input types. For example, a vision model might accept both `text` and `image` inputs.
+</Info>
+
+### Unsupported Parameters
+
+Specify which common parameters your model doesn't support:
+
+```typescript
+unsupported_parameters: [
+  "temperature",         // Model uses fixed temperature
+  "top_p",              // Top-p sampling not available
+  "frequency_penalty",  // Frequency penalty not supported
+  "presence_penalty",   // Presence penalty not supported
+  "max_tokens",         // Fixed output length
+  "top_k",             // Top-k sampling not available
+]
+```
+
+Common parameters include:
+- `temperature` - Controls randomness
+- `top_p` - Nucleus sampling threshold
+- `top_k` - Top-k sampling threshold
+- `max_tokens` - Maximum output length
+- `frequency_penalty` - Penalize frequent tokens
+- `presence_penalty` - Penalize already-present tokens
+- `stop` - Stop sequences
+
+## Advanced Examples
+
+### Multimodal Vision Model
+
+A model that accepts both text prompts and images:
+
+```typescript
+plugin.addModel({
+  name: "custom-ai/vision-analyst",
+  display_name: { en_US: "Vision Analyst" },
+  description: {
+    en_US: "Analyze images and answer questions about them",
+  },
+  icon: "📸",
+  model_type: "llm",
+  input_modalities: ["text", "image"],
+  output_modalities: ["text"],
+  unsupported_parameters: [],
+});
+```
+
+### Family of Model Variants
+
+Register multiple variants of the same base model:
+
+```typescript
+// Small, fast model
+plugin.addModel({
+  name: "custom-ai/assistant-small",
+  display_name: { en_US: "Assistant (Small)" },
+  description: { en_US: "Fast, lightweight model for simple tasks" },
+  icon: "⚡",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: [],
+});
+
+// Medium model
+plugin.addModel({
+  name: "custom-ai/assistant-medium",
+  display_name: { en_US: "Assistant (Medium)" },
+  description: { en_US: "Balanced performance and capability" },
+  icon: "🔷",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: [],
+});
+
+// Large, powerful model
+plugin.addModel({
+  name: "custom-ai/assistant-large",
+  display_name: { en_US: "Assistant (Large)" },
+  description: { en_US: "Most capable model for complex tasks" },
+  icon: "💎",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: [],
+});
+```
+
+### Specialized Domain Models
+
+Create models optimized for specific domains:
+
+```typescript
+// Code generation model
+plugin.addModel({
+  name: "custom-ai/code-master",
+  display_name: { en_US: "Code Master" },
+  description: { en_US: "Specialized for code generation and review" },
+  icon: "💻",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: ["temperature"], // Fixed temp for consistency
+});
+
+// Medical documentation model
+plugin.addModel({
+  name: "custom-ai/medical-scribe",
+  display_name: { en_US: "Medical Scribe" },
+  description: { en_US: "Trained on medical terminology and documentation" },
+  icon: "⚕️",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: [],
+});
+
+// Legal document analyzer
+plugin.addModel({
+  name: "custom-ai/legal-advisor",
+  display_name: { en_US: "Legal Advisor" },
+  description: { en_US: "Analyze and summarize legal documents" },
+  icon: "⚖️",
+  model_type: "llm",
+  input_modalities: ["text"],
+  output_modalities: ["text"],
+  unsupported_parameters: ["temperature"], // Deterministic output
+});
+```
+
+## Model Naming Conventions
+
+Follow these conventions for model names:
+
+<AccordionGroup>
+  <Accordion title="Provider prefix">
+    Start with your provider identifier:
+    ```typescript
+    name: "custom-ai/model-name"
+    //     ^^^^^^^^^^ provider prefix
+    ```
+  </Accordion>
+  
+  <Accordion title="Descriptive names">
+    Use clear, descriptive names:
+    ```typescript
+    // Good
+    "custom-ai/vision-analyst"
+    "custom-ai/code-master"
+    "custom-ai/embeddings-v3"
+    
+    // Avoid
+    "custom-ai/model1"
+    "custom-ai/m"
+    ```
+  </Accordion>
+  
+  <Accordion title="Version suffixes">
+    Include version information:
+    ```typescript
+    "custom-ai/assistant-v1"
+    "custom-ai/assistant-v2"
+    "custom-ai/assistant-2024-01"
+    ```
+  </Accordion>
+  
+  <Accordion title="Variant indicators">
+    Indicate size or specialization:
+    ```typescript
+    "custom-ai/assistant-small"
+    "custom-ai/assistant-medium"
+    "custom-ai/assistant-large"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Choose appropriate model types">
+    Use the correct `model_type` for your model's primary function. This helps users discover and filter models correctly.
+  </Step>
+  
+  <Step title="Accurately specify modalities">
+    Only list modalities your model actually supports. Incorrect modality specifications will cause errors when users try to use the model.
+  </Step>
+  
+  <Step title="Document unsupported parameters">
+    Clearly specify which parameters aren't supported to prevent errors and set proper user expectations.
+  </Step>
+  
+  <Step title="Use descriptive metadata">
+    Provide clear `display_name` and `description` values that help users understand:
+    - What the model does
+    - What it's optimized for
+    - When to use it vs. other models
+  </Step>
+  
+  <Step title="Version your models">
+    Include version information in model names to allow for future updates while maintaining backward compatibility.
+  </Step>
+</Steps>
+
+## Model Registry
+
+All models registered with `addModel()` are:
+- Automatically added to the plugin registry
+- Available in the Atomemo platform
+- Discoverable by users based on their capabilities
+- Selectable in AI workflows and tools
+
+<Note>
+Models are registered but not executed by the plugin. The actual model inference happens on your infrastructure or third-party APIs. This plugin SDK simply makes the models available in the Atomemo platform.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Model Definition" icon="book" href="/api/types/model-definition">
+    Full model API reference
+  </Card>
+  
+  <Card title="Basic Plugin" icon="rocket" href="/examples/basic-plugin">
+    Return to basic plugin example
+  </Card>
+</CardGroup>

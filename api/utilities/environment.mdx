@@ -1,0 +1,182 @@
+---
+title: Environment
+description: Environment variable management and validation for Atomemo plugins
+---
+
+## Overview
+
+The environment module provides type-safe environment variable management with Zod-based validation. It ensures all required environment variables are present and valid before your plugin runs.
+
+## Functions
+
+### getEnv()
+
+Retrieves and validates environment variables. The result is cached after the first call.
+
+```typescript
+function getEnv(): {
+  HUB_MODE: "debug" | "release"
+  HUB_WS_URL: string
+  HUB_DEBUG_API_KEY?: string
+  DEBUG: boolean
+  NODE_ENV: "development" | "production" | "test"
+}
+```
+
+**Returns:** Validated environment configuration object
+
+**Throws:** Exits the process with code 1 if validation fails
+
+#### Example
+
+```typescript
+import { getEnv } from "@atomemo/plugin-sdk"
+
+const env = getEnv()
+
+if (env.DEBUG) {
+  console.log("Debug mode enabled")
+}
+
+console.log(`Connecting to: ${env.HUB_WS_URL}`)
+```
+
+## Environment Variables
+
+### HUB_MODE
+
+**Type:** `"debug" | "release"`
+
+**Default:** `"debug"`
+
+**Description:** The Hub Server runtime mode. Controls the operational mode of the plugin.
+
+**Validation:**
+- Must be either "debug" or "release"
+- Defaults to "debug" if not specified
+
+---
+
+### HUB_WS_URL
+
+**Type:** `string`
+
+**Required:** Yes
+
+**Description:** The URL of the Hub Server WebSocket.
+
+**Validation:**
+- Must be a valid URL
+- Protocol must be either `ws://` or `wss://`
+- Throws error if invalid: "HUB_WS_URL must be a valid WebSocket URL."
+
+**Example Values:**
+```
+wss://hub.atomemo.com/ws
+ws://localhost:8080/ws
+```
+
+---
+
+### HUB_DEBUG_API_KEY
+
+**Type:** `string`
+
+**Required:** Only in production
+
+**Description:** The API key for the Hub Server.
+
+**Validation:**
+- Must be a non-empty string
+- Required when `NODE_ENV` is "production"
+- Optional in development/test environments
+- Throws error if invalid: "HUB_DEBUG_API_KEY must be a string."
+
+---
+
+### DEBUG
+
+**Type:** `boolean`
+
+**Default:** `true` (when `NODE_ENV !== "production"`)
+
+**Description:** Whether to enable debug mode.
+
+**Validation:**
+- Automatically enabled when `NODE_ENV` is not "production"
+- Can be explicitly set to "true" (case-insensitive) to enable
+- Any other value is treated as `false`
+
+**Behavior:**
+- Affects logging level (trace vs error)
+- Controls verbose output in development
+
+---
+
+### NODE_ENV
+
+**Type:** `"development" | "production" | "test"`
+
+**Default:** `"development"`
+
+**Description:** The environment mode.
+
+**Validation:**
+- Must be one of: "development", "production", "test"
+- Defaults to "development" if not specified
+
+## Validation Schema
+
+The environment variables are validated using a Zod schema:
+
+```typescript
+const EnvSchema = z.object({
+  HUB_MODE: z.enum(["debug", "release"]).default("debug"),
+  HUB_WS_URL: z.url({
+    protocol: /wss?/,
+    error: "HUB_WS_URL must be a valid WebSocket URL.",
+  }),
+  HUB_DEBUG_API_KEY: z
+    .string({
+      error: "HUB_DEBUG_API_KEY must be a string.",
+    })
+    .optional()
+    .refine((value) => {
+      return Bun.env.NODE_ENV === "production" || (isString(value) && value.length > 0)
+    }),
+  DEBUG: z
+    .string()
+    .optional()
+    .transform((value) => {
+      return isNil(value) ? process.env.NODE_ENV !== "production" : value.toLowerCase() === "true"
+    }),
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+})
+```
+
+## Error Handling
+
+If validation fails, the function:
+1. Prints a formatted error message to console using `z.prettifyError()`
+2. Exits the process with code 1
+
+This ensures your plugin never runs with invalid configuration.
+
+## Type Safety
+
+The module extends Bun's `Env` interface to provide TypeScript autocomplete:
+
+```typescript
+declare module "bun" {
+  interface Env {
+    readonly HUB_MODE: "debug" | "release"
+    readonly HUB_WS_URL: string | undefined
+    readonly DEBUG: boolean
+    readonly HUB_DEBUG_API_KEY: string | undefined
+  }
+}
+```
+
+## Caching
+
+The environment is validated once and cached. Subsequent calls to `getEnv()` return the cached result without re-validation.
